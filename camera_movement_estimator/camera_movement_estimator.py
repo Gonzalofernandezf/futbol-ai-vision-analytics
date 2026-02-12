@@ -5,30 +5,50 @@ import os
 import sys
 sys.path.append('../')
 
+"""
+Camera Movement Estimation Module
+
+Estimates camera motion across frames using optical flow on field features.
+Adjusts player positions by subtracting camera movement to create a 
+stationary camera perspective.
+"""
+
 class CameraMovementEstimator():
+    """
+    Estimates and compensates for camera movement in video.
+    
+    Uses Lucas-Kanade optical flow on detected field features (corners, lines)
+    to calculate frame-to-frame camera movement. Subtracts this movement
+    from player positions to normalize coordinates.
+    
+    Attributes:
+        features (dict): Parameters for goodFeaturesToTrack detection
+        lk_params (dict): Parameters for Lucas-Kanade optical flow
+    """
+    
     def __init__(self, frame):
-        # Parametros para detectar características (esquinas, líneas blancas del campo)
-        # Él usa goodFeaturesToTrack con estos valores:
+        # Parameters to detect features (corners, white field lines)
+        # It uses goodFeaturesToTrack with these values:
         self.features = dict(maxCorners=100, qualityLevel=0.3, minDistance=3, blockSize=7, mask=None)
         
-        # Parámetros para el Flujo Óptico (Lucas-Kanade)
+        # Parameters for Optical Flow (Lucas-Kanade)
         self.lk_params = dict(winSize=(15, 15), maxLevel=2, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
     def add_adjust_positions_to_tracks(self, tracks, camera_movement_per_frame):
-        # Esta función es CLAVE: Ajusta la posición de los jugadores restando el movimiento de cámara
+        # This function is KEY: Adjusts player positions by subtracting camera movement
         for object, object_tracks in tracks.items():
             for frame_num, track in enumerate(object_tracks):
                 for track_id, track_info in track.items():
                     position = track_info['position']
                     camera_movement = camera_movement_per_frame[frame_num]
                     
-                    # RESTA el movimiento de la cámara a la posición del jugador
+                    # SUBTRACT the camera movement from the player's position
                     position_adjusted = (position[0] - camera_movement[0], position[1] - camera_movement[1])
                     
                     tracks[object][frame_num][track_id]['position_adjusted'] = position_adjusted
 
     def get_camera_movement(self, frames, read_from_stub=False, stub_path=None):
-        # Leer de caché si ya existe (para no recalcular cada vez)
+        # Read from cache if it exists (to avoid recalculating each time)
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
             with open(stub_path, 'rb') as f:
                 return pickle.load(f)
@@ -38,13 +58,13 @@ class CameraMovementEstimator():
         # Convertir primer frame a escala de grises
         old_gray = cv2.cvtColor(frames[0], cv2.COLOR_BGR2GRAY)
         
-        # Detectar puntos clave iniciales
+        # Detect initial key points
         old_features = cv2.goodFeaturesToTrack(old_gray, **self.features)
 
         for frame_num in range(1, len(frames)):
             frame_gray = cv2.cvtColor(frames[frame_num], cv2.COLOR_BGR2GRAY)
             
-            # Calcular Flujo Óptico
+            # Compute Optical Flow
             new_features, status, error = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, old_features, None, **self.lk_params)
 
             max_distance = 0
@@ -63,7 +83,7 @@ class CameraMovementEstimator():
                     
                     max_distance = max(max_distance, (diff_camera_movement_x**2 + diff_camera_movement_y**2)**0.5 )
 
-                # Filtro: Si los puntos se mueven mucho, descartamos (puede ser ruido)
+                # Filter: If points move a lot, discard them (may be noise)
                 if max_distance > 100:
                     camera_movement_x = 0
                     camera_movement_y = 0
@@ -74,7 +94,7 @@ class CameraMovementEstimator():
                 
                 camera_movement[frame_num] = [camera_movement_x, camera_movement_y]
                 
-                # Actualizar puntos para el siguiente frame
+                # Update points for the next frame
                 old_features = cv2.goodFeaturesToTrack(frame_gray, **self.features)
             
             old_gray = frame_gray.copy()

@@ -1,10 +1,29 @@
 import sys 
 sys.path.append('../')
 
+"""
+Ball Possession Assignment Module
+
+Assigns the ball to the closest player in each frame by measuring
+distance from player feet to ball centroid.
+"""
+
 class PlayerBallAssigner():
+    """
+    Determines which player possesses the ball in each frame.
+    
+    Uses Euclidean distance from player feet (bottom center of bounding box)
+    to ball position. The closest player within a threshold distance is
+    assigned possession.
+    
+    Attributes:
+        max_player_ball_distance (int): Maximum distance (pixels) to assign possession
+                                       tune based on video quality/zoom
+    """
+    
     def __init__(self):
-        # NOTA: Si ves que sigue parpadeando, SUBE este número a 80 o 90.
-        # Depende mucho de la calidad/zoom de tu video.
+        # NOTE: If it keeps flickering, RAISE this number to 80 or 90.
+        # Depends a lot on the quality/zoom of your video.
         self.max_player_ball_distance = 70 
     
     def assign_ball_to_player(self, players, ball_bbox):
@@ -16,17 +35,17 @@ class PlayerBallAssigner():
         for player_id, player in players.items():
             player_bbox = player['bbox']
 
-            # La lógica EXACTA del repositorio:
-            # player_bbox es [x1, y1, x2, y2]
-            # [0] es x1 (izq), [2] es x2 (der), [-1] es y2 (abajo/pies)
+            # The EXACT logic of the repository:
+            # player_bbox is [x1, y1, x2, y2]
+            # [0] is x1 (left), [2] is x2 (right), [-1] is y2 (bottom/feet)
             
-            # Distancia al pie izquierdo (x1, y2)
+            # Distance to left foot (x1, y2)
             distance_left = self.measure_distance((player_bbox[0], player_bbox[-1]), ball_position)
             
-            # Distancia al pie derecho (x2, y2)
+            # Distance to right foot (x2, y2)
             distance_right = self.measure_distance((player_bbox[2], player_bbox[-1]), ball_position)
             
-            # Nos quedamos con la mejor de las dos
+            # Keep the best of the two
             distance = min(distance_left, distance_right)
 
             if distance < self.max_player_ball_distance:
@@ -41,5 +60,5 @@ class PlayerBallAssigner():
         return int((x1+x2)/2), int((y1+y2)/2)
 
     def measure_distance(self, p1, p2):
-        # Distancia Euclidiana (Pitágoras)
+        # Euclidean distance (Pythagoras)
         return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**0.5

@@ -1,8 +1,18 @@
 import json
 import numpy as np
 
-# Esta clase ayuda a convertir cosas raras de NumPy a cosas normales de Python
+"""
+Data Export Module
+
+Exports tracking data and match statistics to JSON format.
+Handles NumPy type conversions for JSON serialization and calculates
+per-player metrics (speed, distance, acceleration).
+"""
+
+# This class helps convert odd NumPy objects into normal Python types
 class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle NumPy data types."""
+    
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
@@ -13,12 +23,23 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 class GameStatsExporter:
+    """
+    Exports match tracking data and statistics to JSON format.
+    
+    Handles data transformation from internal tracking format to
+    JSON-serializable output with position metrics, team data,
+    possession statistics, and per-player performance indicators.
+    
+    Attributes:
+        fps (int): Video frame rate for time-based metric conversions
+    """
+    
     def __init__(self, fps=24):
         self.fps = fps
 
-    # AHORA (Añadimos los argumentos con valor 0 por defecto por si acaso):
+    # NOW (Add arguments with default value 0 just in case):
     def export_json(self, tracks, output_path="match_data.json", home_possession=0, away_possession=0, view_transformer=None):
-        # Estructura final
+        # Final structure
         export_data = {
             "match_meta": {
                 "duration_seconds": 0,
@@ -38,8 +59,8 @@ class GameStatsExporter:
         for frame_num, frame_players in enumerate(tracks['players']):
             for player_id, info in frame_players.items():
                 
-                # CORRECCIÓN CRÍTICA: Convertimos el ID a String (Texto)
-                # Esto evita el error "int64" porque JSON prefiere claves en texto
+                # CRITICAL FIX: Convert the ID to a string (text)
+                # This avoids the "int64" error because JSON prefers string keys
                 pid_str = str(player_id)
 
                 if pid_str not in player_stats_temp:
@@ -60,43 +81,42 @@ class GameStatsExporter:
                 player_stats_temp[pid_str]["speeds"].append(speed)
                 player_stats_temp[pid_str]["distances"].append(distance)
 
-                # --- NUEVO: CÁLCULO DE POSICIÓN (X, Y) EN METROS ---
-                # --- NUEVO: CÁLCULO DE POSICIÓN (X, Y) SEGURO ---
+                # NEW: CALCULATION OF POSITION (X, Y) IN METERS
                 position = None
                 if bbox is not None and view_transformer is not None:
                     try:
                         import numpy as np # Importamos la herramienta matemática
                         
-                        # 1. CORRECCIÓN: Convertimos la lista a Numpy Array
+                        # 1. FIX: Convert the list to a Numpy array
                         foot_position = np.array([(bbox[0] + bbox[2])/2, bbox[3]])
                         
-                        # 2. Transformamos
+                        # 2. Transform
                         position = view_transformer.transform_point(foot_position)
                         
-                        # 3. Convertimos y LIMPIAMOS (Quitamos corchetes extra)
+                        # 3. Convert and clean (take out extra parenthesis)
                         if position is not None:
-                            # A. Convertir Numpy a Lista
+                            # A. Convert Numpy to list
                             if hasattr(position, 'tolist'):
                                 position = position.tolist()
                             elif hasattr(position, '__iter__'):
                                 position = list(position)
                             
-                            # B. APLANAR: Si es [[x,y]], nos quedamos con [x,y]
-                            # Verificamos si es una lista dentro de una lista
+                            # B. FLATTEN: If it's [[x,y]], keep [x,y]
+                            # Check if it is a list within a list
                             if isinstance(position, list) and len(position) > 0 and isinstance(position[0], list):
                                 position = position[0]
                                 
                     except Exception as e:
-                        # Si falla, imprimimos aviso pero NO rompemos el programa
+                        # If it fails, print a warning but DO NOT break the program
                         if frame_num == 0: print(f"⚠️ Warning en transformación: {e}")
                         position = None
                     
-                    # Si la transformación falla (devuelve None), guardamos None
+                    # If the transformation fails (returns None), save None
                     if position is not None:
-                        # Convertimos numpy array a lista normal [x, y]
+                        # Convert numpy array to a regular list  [x, y]
                         position = position.tolist() if hasattr(position, 'tolist') else list(position)
                 
-                # Guardamos la posición (o null si no se pudo calcular)
+                # Save the position (or null if it couldn't be calculated)
                 if "positions" not in player_stats_temp[pid_str]:
                     player_stats_temp[pid_str]["positions"] = []
                 player_stats_temp[pid_str]["positions"].append(position)
@@ -104,55 +124,55 @@ class GameStatsExporter:
                 if frame_num % self.fps == 0:
                     player_stats_temp[pid_str]["speed_history"].append(round(speed, 2))
 
-        # Calcular métricas finales
-        # 2. Calcular métricas finales y FILTRAR FANTASMAS
-        # REEMPLAZA LO QUE TIENES DENTRO DEL BUCLE POR ESTO:
+        # Calculate final metrics
+        # 2. Calculate final metrics and FILTER GHOSTS
+        # REPLACE WHAT YOU HAVE INSIDE THE LOOP WITH THIS:
         for player_id, stats in player_stats_temp.items():
             
-            # FILTRO A: ¿Aparece muy poco tiempo? (Ruido / Fantasma)
-            # FIX CTO: Bajamos de 1.5s a 0.5s para no perder jugadores reales con tracks cortados
+            # FILTER A: Appears for a very short time? (Noise / Ghost)
+            # FIX CTO: Lowered from 1.5s to 0.5s to avoid losing real players with short tracks
             speeds = stats["speeds"]
             if len(speeds) < (self.fps * 0.5): continue
             
-            # FILTRO B: ¿Velocidad imposible? (Teletransportación)
-            # Filtramos picos absurdos mayores a 45km/h para el cálculo
-            # 1. MANTENEMOS LOS FILTROS (Esto no cambia)
+            # FILTER B: Impossible speed? (Teleportation)
+            # Filter absurd spikes greater than 45 km/h for calculations
+            # 1. KEEP THE FILTERS (This doesn't change)
             valid_speeds = [s for s in speeds if s < 45]
             max_speed = max(valid_speeds) if valid_speeds else 0
             
-            # FIX CTO: Subimos tolerancia a 40km/h (algunos glitches generan picos altos)
+            # Fix: raise tolerance to 40km/h (some glitches generate high peaks)
             if max_speed > 40: continue
 
             total_distance = max(stats["distances"]) if stats["distances"] else 0
-            # FIX CTO: Permitir porteros que se mueven poco (bajamos de 5m a 1m)
+            # Fix: Allow goalkeepers that move little (lower from 5m to 1m)
             if total_distance < 1: continue
 
-            # 2. NUEVO: CÁLCULO DE ACELERACIÓN (Física)
+            # 2. NEW: ACCELERATION CALCULATION (Physics)
             max_accel = 0
-            # Necesitamos un mínimo de datos para calcular cambios
+            # We need a minimum amount of data to compute changes
             if len(speeds) > 10: 
-                # Convertimos de km/h a m/s (dividiendo por 3.6)
+                # Convert from km/h to m/s (dividing by 3.6)
                 speeds_ms = [s / 3.6 for s in speeds]
                 
-                # Usamos una "ventana" de medio segundo para suavizar el cálculo
+                # Use a half-second window to smooth the calculation
                 window = int(self.fps / 2)
                 if window < 1: window = 1
                 
                 accels = []
-                # Recorremos la lista comparando velocidad actual vs velocidad hace 0.5s
+                # Iterate the list comparing current speed vs speed 0.5s ago
                 for i in range(window, len(speeds_ms)):
                     v_final = speeds_ms[i]
                     v_inicial = speeds_ms[i - window]
                     time_delta = window / self.fps
                     
-                    # Fórmula física: a = (vf - vi) / t
+                    # Physical formula: a = (vf - vi) / t
                     a = (v_final - v_inicial) / time_delta
                     accels.append(a)
                 
                 if accels:
                     max_accel = max(accels)
 
-            # 3. GUARDAR (Añadimos el campo nuevo al diccionario)
+            # 3. SAVE (Add the new field to the dictionary)
             export_data["players"][player_id] = {
                 "team": int(stats["team"]),
                 "max_speed_kmh": round(float(max_speed), 2),
@@ -162,7 +182,7 @@ class GameStatsExporter:
                 "position_history":stats["positions"]
             }
 
-        # Guardar archivo usando el codificador especial que definimos arriba
+        # Save file using the special encoder we defined above
         with open(output_path, 'w') as f:
             json.dump(export_data, f, indent=4, cls=NumpyEncoder)
         
