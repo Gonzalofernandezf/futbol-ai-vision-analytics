@@ -11,7 +11,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent
 
 # File paths
-VIDEO_PATH = os.getenv("VIDEO_PATH", "football_video.mp4")
+VIDEO_PATH = os.getenv("VIDEO_PATH", "video_OG.mp4")
 MODEL_PATH = os.getenv("MODEL_PATH", "best_100e.pt")
 STUB_PATH = os.getenv("STUB_PATH", os.path.join(PROJECT_ROOT, "stubs", "track_stubs.pkl"))
 

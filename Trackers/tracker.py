@@ -33,13 +33,25 @@ class Tracker:
             model_path (str): Path to YOLO model weights (e.g., 'best_100e.pt')
         """
         self.model = YOLO(model_path)
-        self.tracker = sv.ByteTrack(lost_track_buffer=60)
+        # We increase the buffer to 90 frames (approx 3-4 seconds) to keep IDs 
+        # even if the player is occluded or blurred for a while.
+        self.tracker = sv.ByteTrack(
+            track_activation_threshold=0.25,
+            lost_track_buffer=100, 
+            minimum_matching_threshold=0.8
+        )
 
     def detect_frames(self, frames):
         batch_size = 20
         detections = []
         for i in range(0, len(frames), batch_size):
-            detections_batch = self.model.predict(frames[i:i+batch_size], conf=0.1)
+            # 'iou=0.4' obliga a YOLO a borrar cajas que se solapen más de un 40%. 
+            # Esto elimina el "doble bbox" de raíz.
+            detections_batch = self.model.predict(
+                frames[i:i+batch_size], 
+                conf=0.35, # Subimos el suelo de confianza
+                iou=0.4    # NMS más agresivo
+            )
             detections += detections_batch
         return detections
 
@@ -67,6 +79,15 @@ class Tracker:
 
             # Convert to supervision Detection format
             detection_supervision = sv.Detections.from_ultralytics(detection)
+
+            # --- FILTRO ANTI-FANTASMAS ---
+            # 1. Aplicamos NMS extra por si YOLO falló
+            # detection_supervision = detection_supervision.with_nms(threshold=0.5)
+            
+            # 2. Ignoramos todo lo que pase en el tercio superior de la pantalla (gradas)
+            # Asumiendo que y=0 es arriba. Ajusta el 150 si corta cabezas de jugadores.
+            mask = detection_supervision.xyxy[:, 1] > 80 
+            detection_supervision = detection_supervision[mask]
 
             # This prevents the tracker from getting confused if the label changes
             for object_ind, class_id in enumerate(detection_supervision.class_id):
@@ -237,8 +258,9 @@ class Tracker:
         df_ball_positions = pd.DataFrame(ball_bboxes, columns=['x1', 'y1', 'x2', 'y2'])
 
         # 2. Interpolation
-        df_ball_positions = df_ball_positions.interpolate(method='linear', limit=5, limit_direction='both')
-        df_ball_positions = df_ball_positions.bfill()
+        # DESPUÉS (estricto — si no se ve, no se dibuja):
+        df_ball_positions = df_ball_positions.interpolate(method='linear', limit=3, limit_direction='forward')
+        # Eliminar el bfill() completamente para evitar que se dibujen bboxes en frames donde la pelota no es visible al principio del video.     
 
         # 3. Reconstruction 
         ball_positions_interpolated = []

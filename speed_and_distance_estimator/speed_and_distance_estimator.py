@@ -61,6 +61,20 @@ class SpeedAndDistance_Estimator():
                     speed_meters_per_second = distance / time_elapsed
                     speed_km_per_hour = speed_meters_per_second * 3.6
 
+                    # --- ANTI-FLASH FILTER (BIOMECHANICAL LIMIT) ---
+                    # The maximum human speed ever recorded is ~37.6 km/h (Usain Bolt).
+                    # Any speed above 40.0 km/h is physically impossible and indicates:
+                    # A) A video cut/halftime jump (Teleportation).
+                    # B) A perspective matrix transformation jitter.
+                    # C) An ID switch error from the tracker.
+                    MAX_POSSIBLE_SPEED_KMH = 40.0 
+                    
+                    if speed_km_per_hour > MAX_POSSIBLE_SPEED_KMH:
+                        # We ignore this invalid window. This prevents massive fake distances
+                        # from being added during halftime cuts and cleans up the UI graphs.
+                        continue
+                    # -----------------------------------------------
+
                     # 3. Save data in the Tracker
                     if object not in total_distance:
                         total_distance[object] = {}
