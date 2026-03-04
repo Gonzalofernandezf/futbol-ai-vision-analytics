@@ -78,7 +78,19 @@ def main():
     output_path = get_dynamic_output_path(output_dir)
     
     print(f"📁 Video will be saved as: {output_path}")
-    video_frames, fps = read_video(video_path)
+    # Tiempos a analizar dinámicos
+    # Función "helper" interna para convertir reloj a segundos
+    def time_to_sec(time_str):
+        h, m, s = map(int, time_str.split(':'))
+        return h * 3600 + m * 60 + s
+
+    # 2. Leer Video (Con recorte exacto de Primer y Segundo Tiempo)
+    segmentos_partido = [
+        (time_to_sec("0:00:31"), time_to_sec("0:01:06"))
+    ]
+    
+    # Llamamos a la nueva función pasándole los segmentos
+    video_frames, fps = read_video(video_path, segments=segmentos_partido)
 
     # 3. Initialize Tracker
     tracker = Tracker(model_path)
@@ -152,12 +164,14 @@ def main():
     # (This creates the 'position_adjusted' field that we'll use later)
     camera_movement_estimator.add_adjust_positions_to_tracks(tracks, camera_movement_per_frame)
     
-    # 6.5. Perspective Transformation (PIXELS -> METERS)
-    # Initialize the transformer
-    view_transformer = ViewTransformer()
+    # 6.3 Transformación de Perspectiva Dinámica con IA
+    # Instanciamos la clase y le pasamos el nombre de tu modelo de Roboflow
+    view_transformer = ViewTransformer(model_path='modelo_cancha.pt') 
     
-    # Add the transformed position (in meters) to each tracked object
-    # NOTE: This uses 'position_adjusted' that we just calculated in step 6
+    # NUEVO PASO: Le pedimos a la IA que mire todo el video y calcule todas las matrices primero
+    view_transformer.calcular_matrices_para_video(video_frames)
+    
+    # Luego, asignamos los metros a los tracks como hacías normalmente
     view_transformer.add_transformed_position_to_tracks(tracks)
     
     print(" 📐  Perspective transformed: Coordinates in meters calculated.")
@@ -223,22 +237,26 @@ def main():
 
     print("⚽ Calculating ball possession...")
     for frame_num, player_track in enumerate(tracks['players']):
-        ball_bbox = tracks['ball'][frame_num][1]['bbox']
-        assigned_player = player_assigner.assign_ball_to_player(player_track, ball_bbox)
+        # --- FIX: ACCESO SEGURO A LA PELOTA ---
+        ball_dict = tracks['ball'][frame_num]
+        
+        # Verificamos si la IA realmente detectó una pelota con el ID 1 en este frame
+        if 1 in ball_dict:
+            ball_bbox = ball_dict[1]['bbox']
+            assigned_player = player_assigner.assign_ball_to_player(player_track, ball_bbox)
 
-        if assigned_player != -1:
-            tracks['players'][frame_num][assigned_player]['has_ball'] = True
-
-            # Save which team has the ball for statistics
-            team_id = tracks['players'][frame_num][assigned_player]['team']
-            team_ball_control.append(team_id)
-        else:
-            # If nobody has it, add the last team that had it (to avoid flicker in statistics)
-            # Or simply None if you prefer pure accuracy
-            if team_ball_control:
-                team_ball_control.append(team_ball_control[-1])
+            if assigned_player != -1:
+                tracks['players'][frame_num][assigned_player]['has_ball'] = True
+                team_id = tracks['players'][frame_num][assigned_player]['team']
+                team_ball_control.append(team_id)
             else:
-                team_ball_control.append(None) # Nadie lo ha tenido aún
+                # Nadie la tiene clara, mantenemos posesión anterior
+                team_ball_control.append(team_ball_control[-1] if team_ball_control else None)
+        else:
+            # La pelota desapareció o no se detectó en este frame. 
+            # No explotamos, simplemente mantenemos la posesión del último equipo.
+            team_ball_control.append(team_ball_control[-1] if team_ball_control else None)
+        # --------------------------------------
 
     # Print a quick summary to the console
     team1_num_frames = team_ball_control.count(1)
@@ -249,40 +267,41 @@ def main():
 
     print(f"📊 Estimated possession: Team 1: {team1_num_frames/total*100:.1f}% - Team 2: {team2_num_frames/total*100:.1f}%")
     
-    
+    # -----------COMENTAMOS BLOQUE COMPLETO PORQUE APLICA PARA OTRO VIDEO--------------------------
     # Smart hardcode block(Auto Color Detection)
     # Goal: Determine which ID (1 or 2) corresponds to the white/bright team based on the sum of their RGB colors.
     
     # 1. Retrieve the colors learned by the TeamAssigner
-    color_team_1 = team_assigner.team_colors[1]
-    color_team_2 = team_assigner.team_colors[2]
+    #color_team_1 = team_assigner.team_colors[1]
+    #color_team_2 = team_assigner.team_colors[2]
     
     # 2. Compare "Luminosity" (Sum R+G+B)
-    # White (255,255,255) sums to ~765. Dark green or black sums much less.
-    if sum(color_team_1) > sum(color_team_2):
-        id_equipo_blanco = 1
-        id_equipo_color = 2
-        print(f"⚪ Auto-Detect: WHITE team is ID {id_equipo_blanco} (Brighter)")
-    else:
-        id_equipo_blanco = 2
-        id_equipo_color = 1
-        print(f"⚪ Auto-Detect: WHITE team is ID {id_equipo_blanco} (Brighter)")
+    #White (255,255,255) sums to ~765. Dark green or black sums much less.
+    #if sum(color_team_1) > sum(color_team_2):
+    #    id_equipo_blanco = 1
+    #    id_equipo_color = 2
+    #    print(f"⚪ Auto-Detect: WHITE team is ID {id_equipo_blanco} (Brighter)")
+    #else:
+    #    id_equipo_blanco = 2
+    #    id_equipo_color = 1
+    #    print(f"⚪ Auto-Detect: WHITE team is ID {id_equipo_blanco} (Brighter)")
 
     # 3. Forced assignment to your key players
     # List of players YOU know play in white (e.g., 135, 17)
-    jugadores_blancos_ids = [135, 17]
+    # jugadores_blancos_ids = [135, 17]
 
-    print(f"🔧 Forcing players {jugadores_blancos_ids} to WHITE team (ID {id_equipo_blanco})...")
+    #print(f"🔧 Forcing players {jugadores_blancos_ids} to WHITE team (ID {id_equipo_blanco})...")
 
-    for frame_num, player_track in enumerate(tracks['players']):
-        for player_id, track in player_track.items():
+    #for frame_num, player_track in enumerate(tracks['players']):
+    #    for player_id, track in player_track.items():
             
             # If the player is in your 'White' list
-            if player_id in jugadores_blancos_ids:
-                # Assign the ID we detected as white
-                tracks['players'][frame_num][player_id]['team'] = id_equipo_blanco
-                tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[id_equipo_blanco]
-    
+    #        if player_id in jugadores_blancos_ids:
+    #            # Assign the ID we detected as white
+    #            tracks['players'][frame_num][player_id]['team'] = id_equipo_blanco
+    #            tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[id_equipo_blanco]
+    # -----------FIN BLOQUE COMENTADO COMPLETO PORQUE APLICA PARA OTRO VIDEO--------------------------
+
     # 9. Draw
     print("🎨 Drawing ellipses and triangles...")
     # First draw the tracker annotations (ellipses, etc.)

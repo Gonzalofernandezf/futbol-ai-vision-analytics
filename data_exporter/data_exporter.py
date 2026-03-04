@@ -91,7 +91,7 @@ class GameStatsExporter:
                         foot_position = np.array([(bbox[0] + bbox[2])/2, bbox[3]])
                         
                         # 2. Transform
-                        position = view_transformer.transform_point(foot_position)
+                        position = view_transformer.transform_point(foot_position, frame_num)
                         
                         # 3. Convert and clean (take out extra parenthesis)
                         if position is not None:
@@ -116,10 +116,18 @@ class GameStatsExporter:
                         # Convert numpy array to a regular list  [x, y]
                         position = position.tolist() if hasattr(position, 'tolist') else list(position)
                 
-                # Save the position (or null if it couldn't be calculated)
+                # Fix: forward fill
                 if "positions" not in player_stats_temp[pid_str]:
                     player_stats_temp[pid_str]["positions"] = []
-                player_stats_temp[pid_str]["positions"].append(position)
+                
+                # If we have a valid position, add it.
+                if position is not None:
+                    player_stats_temp[pid_str]["positions"].append(position)
+                else:
+                    # If position is null (player hidden or matrix failed), 
+                    # repeat the last known position to keep the heatmap alive.
+                    last_known = player_stats_temp[pid_str]["positions"][-1] if player_stats_temp[pid_str]["positions"] else None
+                    player_stats_temp[pid_str]["positions"].append(last_known)
 
                 if frame_num % self.fps == 0:
                     player_stats_temp[pid_str]["speed_history"].append(round(speed, 2))
@@ -132,20 +140,24 @@ class GameStatsExporter:
             # FILTER A: Appears for a very short time? (Noise / Ghost)
             # FIX CTO: Lowered from 1.5s to 0.5s to avoid losing real players with short tracks
             speeds = stats["speeds"]
-            if len(speeds) < (self.fps * 0.5): continue
+            total_distance = max(stats["distances"]) if stats["distances"] else 0
+
+            # eliminar jugadores que aparecen poco tiempo,
+            if len(speeds) < (self.fps * 0.3): 
+                continue # Mínimo 0.3 segundos (7 frames a 24fps)
+            if total_distance < 0.5:  # Mínimo 0.5 metros recorridos
+                continue
             
             # FILTER B: Impossible speed? (Teleportation)
             # Filter absurd spikes greater than 45 km/h for calculations
             # 1. KEEP THE FILTERS (This doesn't change)
             valid_speeds = [s for s in speeds if s < 45]
             max_speed = max(valid_speeds) if valid_speeds else 0
-            
-            # Fix: raise tolerance to 40km/h (some glitches generate high peaks)
-            if max_speed > 40: continue
 
-            total_distance = max(stats["distances"]) if stats["distances"] else 0
+            
             # Fix: Allow goalkeepers that move little (lower from 5m to 1m)
-            if total_distance < 1: continue
+            #comentamos para no eliminar
+            #if total_distance < 1: continue
 
             # 2. NEW: ACCELERATION CALCULATION (Physics)
             max_accel = 0

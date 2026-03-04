@@ -19,7 +19,7 @@
             color: white;
         }
 
-        /* Animación suave */
+        /* Soft animation */
         .fade-in {
             animation: fadeIn 0.5s;
         }
@@ -611,7 +611,7 @@
 
 
     <script>
-        // 1. SISTEMA DE NAVEGACIÓN (TABS)
+        // 1. Navigation systems (TABS)
         function showSection(sectionId) {
             document.querySelectorAll('main > div').forEach(div => div.classList.add('hidden'));
             document.querySelectorAll('aside nav button').forEach(btn => btn.classList.remove('active-nav', 'bg-green-600'));
@@ -620,7 +620,7 @@
             document.getElementById('btn-' + sectionId).classList.add('active-nav');
         }
 
-        // 2. SISTEMA DE MODALES (POP-UPS)
+        // 2. Modal Systems (pop-ups)
         function toggleModal(modalId) {
             const modal = document.getElementById(modalId);
             if (modal.classList.contains('hidden')) {
@@ -630,7 +630,7 @@
             }
         }
 
-        // 3. DATOS SIMULADOS (MOCK DATA) DE LOS 4 JUGADORES
+        // 3. Mock data from 4 players
         const mockPlayers = [
             {
                 name: "Thiago Almada Jr.",
@@ -674,16 +674,16 @@
             }
         ];
 
-        // 4. FUNCIÓN BUSCAR (Simulación)
+        // 4. Search functionality (Simulation)
         function performSearch() {
             // Cierra el modal
             toggleModal('filter-modal');
 
-            // Simula carga
+            // Search simulation
             const tbody = document.querySelector('tbody');
             tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-green-400"><i class="fas fa-circle-notch fa-spin text-2xl"></i> Buscando en la base de datos IA...</td></tr>';
 
-            // Muestra resultados después de 1 segundo
+            // Show the results after 1 second
             setTimeout(() => {
                 let html = '';
                 mockPlayers.forEach((p, index) => {
@@ -705,8 +705,8 @@
             }, 800);
         }
 
-        // 5. ABRIR FICHA DE JUGADOR Y GRÁFICO
-        let radarChartInstance = null; // Para guardar la instancia del gráfico
+        // 5. Open player card and radar chart
+        let radarChartInstance = null; // Save graph instance
 
         function openPlayerCard(index) {
             const player = mockPlayers[index];
@@ -717,12 +717,12 @@
             document.getElementById('pm-age').innerText = player.age + " años";
             document.getElementById('pm-value').innerText = player.val;
             document.getElementById('pm-img').src = player.img;
-            document.getElementById('pm-comparison').innerHTML = player.comparison; // Usamos innerHTML para permitir negritas
+            document.getElementById('pm-comparison').innerHTML = player.comparison; // We use innerHTML to allow boldformatting
 
-            // Mostrar Modal
+            // Show Modal
             toggleModal('player-modal');
 
-            // Generar Gráfico Radar (Destruir anterior si existe)
+            // Generate a radar graph (Delete previous if it exists)
             if (radarChartInstance) {
                 radarChartInstance.destroy();
             }
@@ -735,13 +735,13 @@
                     datasets: [{
                         label: player.name,
                         data: player.stats,
-                        backgroundColor: 'rgba(16, 185, 129, 0.4)', // Verde
+                        backgroundColor: 'rgba(16, 185, 129, 0.4)', // green
                         borderColor: '#10B981',
                         pointBackgroundColor: '#fff',
                         borderWidth: 2
                     }, {
                         label: 'Media Liga',
-                        data: [65, 70, 60, 65, 70, 65], // Media genérica
+                        data: [65, 70, 60, 65, 70, 65], // Generic average for comparison
                         backgroundColor: 'rgba(107, 114, 128, 0.1)',
                         borderColor: '#6B7280',
                         borderWidth: 1,
@@ -765,9 +765,9 @@
             });
         }
 
-        // 6. INICIALIZACIÓN DE GRÁFICOS DEL DASHBOARD (Los que ya tenías)
+        // 6. Dashboard graph initialization 
         document.addEventListener("DOMContentLoaded", function () {
-            // Gráfico Radar (Dashboard General)
+            // Radar Graph (General Dashboard)
             const ctxTeam = document.getElementById('teamChart').getContext('2d');
             new Chart(ctxTeam, {
                 type: 'radar',
@@ -776,7 +776,7 @@
                     datasets: [{
                         label: 'Nuestro Equipo',
                         data: [85, 90, 75, 80, 88, 92],
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)', // Azul
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)', // Blue
                         borderColor: '#3B82F6',
                         pointBackgroundColor: '#fff'
                     }]
@@ -787,34 +787,9 @@
                 }
             });
 
-            // Gráfico Lineal (Video Lab)
-            const ctxSpeed = document.getElementById('speedChart').getContext('2d');
-            new Chart(ctxSpeed, {
-                type: 'line',
-                data: {
-                    labels: ['0s', '5s', '10s', '15s', '20s', '25s', '30s'],
-                    datasets: [{
-                        label: 'Velocidad (km/h)',
-                        data: [12, 15, 28, 26, 10, 5, 22],
-                        borderColor: '#FBBF24',
-                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { grid: { color: '#374151' }, ticks: { color: '#9CA3AF' } },
-                        x: { grid: { display: false }, ticks: { color: '#9CA3AF' } }
-                    },
-                    plugins: { legend: { display: false } }
-                }
-            });
+            
         });
-        // --- NUEVO: LÓGICA DE RIVALES ---
-
+        // Rivals logic
         const mockRivals = [
             {
                 name: "Real Madrid",
@@ -822,7 +797,7 @@
                 style: "Contragolpe Letal",
                 km: "112.5 km",
                 sprints: "Muy Alta",
-                color: "text-gray-800", // Para el logo
+                color: "text-gray-800", // For logo color
                 analysis: "El rival prioriza la solidez defensiva en bloque medio, buscando atraer la presión para lanzar a Vinicius y Rodrygo al espacio. **Punto débil:** Sufren en transiciones ataque-defensa si pierden el balón en carriles interiores. La IA ha detectado que el 60% de sus goles recibidos vienen por centros laterales rasos.",
                 players: [
                     { name: "Vinicius Jr", role: "Extremo", note: "Velocidad punta 36km/h. Doblar marca." },
@@ -860,7 +835,7 @@
         function openRivalModal(index) {
             const rival = mockRivals[index];
 
-            // Rellenar datos básicos
+            // Fill basic data
             document.getElementById('rm-name').innerText = rival.name;
             document.getElementById('rm-logo').innerText = rival.abbr;
             document.getElementById('rm-logo').className = `w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl font-bold shadow-lg ${rival.color}`;
@@ -868,12 +843,12 @@
             document.getElementById('rm-km').innerText = rival.km;
             document.getElementById('rm-sprints').innerText = rival.sprints;
 
-            // Rellenar análisis (con soporte para negritas simuladas)
+            // Fill analysis (with support for bold text simulation)
             document.getElementById('rm-analysis').innerHTML = rival.analysis.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
 
-            // Rellenar jugadores clave
+            // Fill key players
             const playersContainer = document.getElementById('rm-key-players');
-            playersContainer.innerHTML = ''; // Limpiar anterior
+            playersContainer.innerHTML = ''; // Clear olddata
 
             rival.players.forEach(p => {
                 playersContainer.innerHTML += `
@@ -895,9 +870,7 @@
     </script>
 
     <script>
-        // ==========================================
-        // 1. SISTEMA DE NAVEGACIÓN (TABS)
-        // ==========================================
+        // 1. Navigation system (TABS)
         function showSection(sectionId) {
             document.querySelectorAll('main > div').forEach(div => {
                 if (div.id) div.classList.add('hidden');
@@ -917,20 +890,18 @@
             }
         }
 
-        // ==========================================
-        // 2. LÓGICA DE DATOS AVANZADA
-        // ==========================================
+        // 2. Advanced data logic
         document.addEventListener("DOMContentLoaded", async function () {
             console.log("🚀 Iniciando FutbolAI Dashboard v2.0...");
 
             try {
-                // A. CARGAR DATOS JSON
+                // A. Load JSON data 
                 const response = await fetch('match_data.json');
                 if (!response.ok) throw new Error("No se encontró match_data.json");
                 const data = await response.json();
                 console.log("✅ Datos cargados:", data);
 
-                // B. ELEMENTOS DEL DOM
+                // B. DOM elements 
                 const selector = document.getElementById('player-selector');
                 const playersList = document.getElementById('selector-players-list');
 
@@ -942,35 +913,35 @@
                 const canvas = document.getElementById('heatmap-canvas');
                 const ctx = canvas ? canvas.getContext('2d') : null;
 
-                // Definimos los colores para que coincidan con las elipses del video
+                // Define colors so it matches the video elipses 
                 const TEAM_COLORS = {
                     1: {
-                        main: "#FFFFFF",              // Puntos blancos en el mapa
-                        bg: "bg-gray-100 text-black", // Círculo del ID blanco con texto negro
+                        main: "#FFFFFF",              // White dots on the map
+                        bg: "bg-gray-100 text-black", // White ID circle with black text
                         border: "border-gray-400",
-                        icon: "⚪"                     // Icono para el desplegable
+                        icon: "⚪"                     // Icon for drop-down
                     },
                     2: {
-                        main: "#00FF00",              // Puntos verde neón
-                        bg: "bg-green-600 text-white", // Círculo verde con texto blanco
+                        main: "#00FF00",              // Green neonn dots on the map
+                        bg: "bg-green-600 text-white", // Green circle with white text
                         border: "border-green-400",
                         icon: "🟢"
                     }
                 };
 
-                // C. DIBUJAR MAPA (CON CORRECCIÓN DE EJE Y)
+                // C. Draw map with Y axis correction
                 function drawHeatmap(positions, color) {
                     if (!ctx || !canvas) return;
 
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    // 1. Aseguramos que el área de dibujo sea igual al tamaño visual
+                    // 1. Ensure that the drawing area is equal to the visual size.
                     canvas.width = canvas.clientWidth;
                     canvas.height = canvas.clientHeight;
 
-                    // 2. Definimos las dimensiones reales del campo (metros)
+                    // 2. Define real dimensions of the pitch (meters)
                     const fieldWidth = 105;
                     const fieldHeight = 68;
-                    // 3. Calculamos cuántos píxeles corresponden a 1 metro
+                    // 3. Calculate how many pixels correspond to 1 meter
                     const scaleX = canvas.width / fieldWidth;
                     const scaleY = canvas.height / fieldHeight;
 
@@ -980,21 +951,21 @@
 
                     positions.forEach(pos => {
                         if (Array.isArray(pos) && pos.length >= 2 && pos[0] !== null) {
-                            // [cite: 348] Corrección de Ejes
-                            // Asegúrate de que las coordenadas coinciden con tu calibración (105x68)
-                            // Si x_meters viene negativo o > 105, el clamp lo arregla visualmente
+                            // Axis correction
+                            // Ensure that the coordinates match your calibration (105x68).
+                            // If x_meters is negative or > 105, the clamp fixes it visually.
 
                             const x_meters = Math.max(0, Math.min(105, pos[0])); 
                             const y_meters = Math.max(0, Math.min(68, pos[1]));
 
-                            // 1. Coordenada X (Normal)
+                            // 1. X coordinate (Normal)
                             const x = x_meters * scaleX;
 
-                            // 2. Coordenada Y 
-                            // Si tus datos vienen con (0,0) en la esquina superior izquierda del campo real:
+                            // 2. Y coordinate 
+                            // If your data comes with (0,0) in the upper left corner of the actual field:
                             const y = y_meters * scaleY; 
 
-                            // SOLO SI tus datos vienen con (0,0) en la esquina INFERIOR izquierda (sistema cartesiano clásico):
+                            // ONLY IF your data comes with (0,0) in the LOWER left corner (classic Cartesian system):
                             // const y = canvas.height - (y_meters * scaleY);
 
                             ctx.beginPath();
@@ -1007,12 +978,12 @@
                     ctx.globalAlpha = 1.0;
                 }
 
-                // D. ACTUALIZAR DASHBOARD
+                // D. Update dashboard based on selection
                 function updateDashboard(selection) {
                     let positionsToDraw = [];
                     let mainColor = "#FFFFFF";
 
-                    // --- MODO EQUIPO ---
+                    // Team mode
                     if (selection === "team1" || selection === "team2") {
                         const teamId = selection === "team1" ? 1 : 2;
                         mainColor = TEAM_COLORS[teamId].main;
@@ -1031,7 +1002,7 @@
                         tagAccel.classList.add('hidden');
 
                     }
-                    // --- MODO JUGADOR ---
+                    // Player mode
                     else {
                         const playerId = selection;
                         const p = data.players[playerId];
@@ -1060,22 +1031,57 @@
                                 tagAccel.className = "text-[10px] px-2 py-1 rounded bg-gray-600 text-gray-300";
                                 tagAccel.innerText = "NORMAL";
                             }
-                        }
-                    }
+
+                            // --- INICIO NUEVO CÓDIGO DE LA GRÁFICA DINÁMICA ---
+                            if (window.speedChartInstance) {
+                                window.speedChartInstance.destroy();
+                            }
+                            
+                            const ctxSpeed = document.getElementById('speedChart').getContext('2d');
+                            // Generamos las etiquetas de tiempo (0s, 1s, 2s...) según los datos reales
+                            const labels = p.speed_over_time.map((_, i) => `${i}s`);
+                            
+                            window.speedChartInstance = new Chart(ctxSpeed, {
+                                type: 'line',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: `Velocidad Jugador #${playerId} (km/h)`,
+                                        data: p.speed_over_time,
+                                        borderColor: '#FBBF24',
+                                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                                        tension: 0.4,
+                                        fill: true
+                                    }]
+                                },
+                                options: { 
+                                    responsive: true, 
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: { grid: { color: '#374151' }, ticks: { color: '#9CA3AF' } },
+                                        x: { grid: { display: false }, ticks: { color: '#9CA3AF' } }
+                                    },
+                                    plugins: { legend: { display: false } }
+                                }
+                            });
+                            // --- FIN NUEVO CÓDIGO DE LA GRÁFICA DINÁMICA ---
+
+                        } // Fin del if (p)
+                    } // Fin del Player mode
 
                     drawHeatmap(positionsToDraw, mainColor);
                 }
 
-                // E. RELLENAR LISTA (ORDENADA)
+                // E. Fill list (Ordered)
                 if (playersList) {
                     playersList.innerHTML = "";
 
-                    // DEBUG: Ver en consola cuántos jugadores hay en total
+                    // DEBUG: See how many players there are in total on the console
                     console.log("Total jugadores en JSON:", Object.keys(data.players).length);
 
-                    // Convertimos a array para ordenar
+                    // Convert into array to order
                     const sortedPlayers = Object.entries(data.players).sort(([, a], [, b]) => {
-                        // Ordenar primero por equipo, luego por velocidad
+                        // Order first by team, then by speed
                         if (a.team !== b.team) return a.team - b.team;
                         return b.max_speed_kmh - a.max_speed_kmh;
                     });
@@ -1084,8 +1090,8 @@
                         const option = document.createElement('option');
                         option.value = pid;
                         
-                        // CORRECCIÓN: Usamos el diccionario TEAM_COLORS si existe, si no, interrogación
-                        // Esto asegura que si TEAM_COLORS[1] tiene el icono "⚪", se use ese.
+                        // Fix: Use the dictionary TEAM_COLORS if exists, otherwise question mark
+                        // This ensures that if TEAM_COLORS[1] has the icon “⚪”, that one is used.
                         const teamInfo = TEAM_COLORS[p.team] || { icon: "❓" };
                         
                         option.innerText = `${teamInfo.icon || "•"} #${pid} (${p.max_speed_kmh} km/h)`;
@@ -1093,15 +1099,15 @@
                     });
                 }
 
-                // F. LISTENERS
+                // F. Listeners
                 if (selector) {
                     selector.addEventListener('change', (e) => updateDashboard(e.target.value));
-                    // Iniciar con Equipo 2 (Local / Verde) que suele ser el protagonista
+                    // Initiate with team 2 (Local / Green) Tends to be protagonist in videos, so good for demo
                     selector.value = "team2";
                     updateDashboard("team2");
                 }
 
-                // G. POSESIÓN
+                // G. Posesion
                 if (data.match_meta) {
                     const pos = data.match_meta.home_possession;
                     const textElem = document.getElementById('possession-text');

@@ -1,21 +1,38 @@
 import cv2
 
-def read_video(video_path):
+def read_video(video_path, segments=None):
     cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
     frames = []
     
-    # Read the original FPS from the video
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frames.append(frame)
+    if not segments:
+        print("🎬 Leyendo el video completo...")
+        while True:
+            ret, frame = cap.read()
+            if not ret: break
+            frames.append(frame)
+    else:
+        for i, (start_sec, end_sec) in enumerate(segments):
+            start_frame = int(start_sec * fps)
+            end_frame = int(end_sec * fps)
+            
+            cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+            current_frame = start_frame
+            
+            print(f"🎬 Extrayendo Tiempo {i+1}: Desde el segundo {start_sec} hasta el {end_sec}...")
+            
+            while current_frame < end_frame:
+                ret, frame = cap.read()
+                if not ret: 
+                    break 
+                frames.append(frame)
+                current_frame += 1
+                
     cap.release()
-    
-    # Now we return TWO things: the list of frames AND the fps
+    print(f"✅ Extracción completada. Total de fotogramas a analizar: {len(frames)}")
     return frames, fps
+
+# (Tu función save_video sigue igual abajo)
 
 def save_video(output_video_frames, output_video_path, fps=25):
     if not output_video_frames:
