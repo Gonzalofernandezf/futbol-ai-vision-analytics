@@ -98,7 +98,7 @@ def main():
     # 4. Get tracks (this will be instant now!)
     tracks = tracker.get_object_tracks(
         video_frames, 
-        read_from_stub=True, 
+        read_from_stub=False, 
         stub_path=stub_path
     )
 
@@ -156,7 +156,7 @@ def main():
     # 1. Calculate how much the camera moves in X and Y
     camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
         video_frames,
-        read_from_stub=True,
+        read_from_stub=False,
         stub_path='stubs/camera_movement_stub.pkl'
     )
 
@@ -173,8 +173,20 @@ def main():
     
     # Luego, asignamos los metros a los tracks como hacías normalmente
     view_transformer.add_transformed_position_to_tracks(tracks)
-    
+
     print(" 📐  Perspective transformed: Coordinates in meters calculated.")
+
+    # Filter out ball false positives: remove any detection where the ball would
+    # have to travel faster than BALL_MAX_SPEED_MPS (real-world meters) in one frame.
+    # This runs AFTER the view transformer so distances are in meters, not pixels.
+    tracks["ball"] = tracker.filter_ball_positions_by_speed(
+        tracks["ball"],
+        fps,
+        max_speed_mps  = config.BALL_MAX_SPEED_MPS,
+        pitch_length   = config.PITCH_LENGTH_M,
+        pitch_width    = config.PITCH_WIDTH_M,
+        pitch_margin   = config.PITCH_MARGIN_M,
+    )
 
     # 6.8. Speed and distance estimation 
     speed_and_distance_estimator = SpeedAndDistance_Estimator()

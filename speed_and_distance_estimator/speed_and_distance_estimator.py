@@ -91,7 +91,13 @@ class SpeedAndDistance_Estimator():
                         tracks[object][frame_num_batch][track_id]['distance'] = total_distance[object][track_id]
 
         # SMART FORWARD FILL (With tolerance limit)
-        MAX_FRAME_GAP = 12  # Limit: 0.5 seconds (at 24fps). More than this is lying 
+        # Why 45: position_transformed returns None whenever the homography is
+        # degraded (camera pan, pitch keypoints occluded). The speed window is
+        # skipped for every such frame, so a 1-second pan at 30fps generates a
+        # 30-frame gap with no speed data. 12 frames (~0.4 s) wasn't enough to
+        # bridge that. 45 frames (~1.5 s) covers typical broadcast camera pans
+        # while still "dying" cleanly when a player genuinely leaves the pitch.
+        MAX_FRAME_GAP = 45
 
         for object, object_tracks in tracks.items():
             if object == "ball" or object == "referees": continue

@@ -68,7 +68,7 @@ class GameStatsExporter:
                         "team": info.get('team', 0),
                         "speeds": [],
                         "distances": [],
-                        "speed_history": []
+                        "speed_by_second": {}
                     }
 
                 speed = info.get('speed', 0)
@@ -116,21 +116,22 @@ class GameStatsExporter:
                         # Convert numpy array to a regular list  [x, y]
                         position = position.tolist() if hasattr(position, 'tolist') else list(position)
                 
-                # Fix: forward fill
                 if "positions" not in player_stats_temp[pid_str]:
                     player_stats_temp[pid_str]["positions"] = []
-                
-                # If we have a valid position, add it.
-                if position is not None:
-                    player_stats_temp[pid_str]["positions"].append(position)
-                else:
-                    # If position is null (player hidden or matrix failed), 
-                    # repeat the last known position to keep the heatmap alive.
-                    last_known = player_stats_temp[pid_str]["positions"][-1] if player_stats_temp[pid_str]["positions"] else None
-                    player_stats_temp[pid_str]["positions"].append(last_known)
 
-                if frame_num % self.fps == 0:
-                    player_stats_temp[pid_str]["speed_history"].append(round(speed, 2))
+                # Append the position (or None when the player isn't visible / homography failed).
+                # We deliberately do NOT forward-fill None with the last known position:
+                # a bad transform (garbage coords) would get propagated to many frames and
+                # appear as a cluster at a pitch corner in the heatmap.
+                # The HTML already skips null entries, so honest gaps are safe.
+                player_stats_temp[pid_str]["positions"].append(position)
+
+                fps_int = round(self.fps)
+                if frame_num % fps_int == 0:
+                    speed_val = info.get('speed', None)
+                    if speed_val is not None:
+                        second_idx = frame_num // fps_int
+                        player_stats_temp[pid_str]["speed_by_second"][second_idx] = round(speed_val, 2)
 
         # Calculate final metrics
         # 2. Calculate final metrics and FILTER GHOSTS
@@ -184,14 +185,19 @@ class GameStatsExporter:
                 if accels:
                     max_accel = max(accels)
 
-            # 3. SAVE (Add the new field to the dictionary)
+            # 3. Build full-duration speed timeline (one entry per second of video).
+            # Missing seconds → None so Chart.js renders visible gaps between segments.
+            total_video_seconds = int(total_frames / self.fps) + 1
+            speed_by_second = stats.get("speed_by_second", {})
+            speed_over_time = [speed_by_second.get(s, None) for s in range(total_video_seconds)]
+
             export_data["players"][player_id] = {
                 "team": int(stats["team"]),
                 "max_speed_kmh": round(float(max_speed), 2),
                 "total_distance_m": round(float(total_distance), 2),
-                "max_acceleration_ms2": round(float(max_accel), 2), # <--- ¡DATO NUEVO!
-                "speed_over_time": stats["speed_history"],
-                "position_history":stats["positions"]
+                "max_acceleration_ms2": round(float(max_accel), 2),
+                "speed_over_time": speed_over_time,
+                "position_history": stats["positions"]
             }
 
         # Save file using the special encoder we defined above

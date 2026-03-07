@@ -888,6 +888,12 @@
                 btn.classList.add('active-nav', 'bg-green-600', 'text-white');
                 btn.classList.remove('text-gray-300');
             }
+
+            // Redraw heatmap after the section becomes visible so canvas.offsetWidth is
+            // correct.  Without this, navigating away and back leaves the canvas blank.
+            if (sectionId === 'dashboard' && typeof _lastHeatmapCall !== 'undefined' && _lastHeatmapCall) {
+                requestAnimationFrame(() => drawHeatmap(_lastHeatmapCall.positions, _lastHeatmapCall.color));
+            }
         }
 
         // 2. Advanced data logic
@@ -929,52 +935,50 @@
                     }
                 };
 
-                // C. Draw map with Y axis correction
+                // C. Draw heatmap
+                // Stores the last draw call so we can replay it when the tab becomes visible.
+                let _lastHeatmapCall = null;
+
                 function drawHeatmap(positions, color) {
                     if (!ctx || !canvas) return;
 
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    // 1. Ensure that the drawing area is equal to the visual size.
-                    canvas.width = canvas.clientWidth;
-                    canvas.height = canvas.clientHeight;
+                    // Cache for redraws triggered by tab switches.
+                    _lastHeatmapCall = { positions, color };
 
-                    // 2. Define real dimensions of the pitch (meters)
-                    const fieldWidth = 105;
-                    const fieldHeight = 68;
-                    // 3. Calculate how many pixels correspond to 1 meter
-                    const scaleX = canvas.width / fieldWidth;
-                    const scaleY = canvas.height / fieldHeight;
+                    // Use offsetWidth (reliable even before first paint) and fall back to a
+                    // sensible default.  clientWidth can return 0 when the canvas is hidden,
+                    // which would set scaleX = 0 and collapse all points to (0,0).
+                    const w = canvas.offsetWidth  || canvas.clientWidth  || 800;
+                    const h = canvas.offsetHeight || canvas.clientHeight || Math.round(w * 68 / 105);
 
-                    ctx.fillStyle = color;
+                    canvas.width  = w;
+                    canvas.height = h;
+
+                    const scaleX = w / 105;
+                    const scaleY = h / 68;
+
+                    ctx.fillStyle   = color;
                     ctx.globalAlpha = 0.6;
-                    ctx.filter = "blur(6px)";
+                    ctx.filter      = "blur(6px)";
 
                     positions.forEach(pos => {
-                        if (Array.isArray(pos) && pos.length >= 2 && pos[0] !== null) {
-                            // Axis correction
-                            // Ensure that the coordinates match your calibration (105x68).
-                            // If x_meters is negative or > 105, the clamp fixes it visually.
+                        // Skip nulls and non-arrays.
+                        if (!Array.isArray(pos) || pos.length < 2 || pos[0] === null) return;
 
-                            const x_meters = Math.max(0, Math.min(105, pos[0])); 
-                            const y_meters = Math.max(0, Math.min(68, pos[1]));
+                        const xm = pos[0];
+                        const ym = pos[1];
 
-                            // 1. X coordinate (Normal)
-                            const x = x_meters * scaleX;
+                        // Skip positions outside the pitch + a small 3 m margin.
+                        // Do NOT clamp: clamping silently maps garbage coords ([975,568] from
+                        // a degenerate homography) to pitch corners, creating false clusters.
+                        if (xm < -3 || xm > 108 || ym < -3 || ym > 71) return;
 
-                            // 2. Y coordinate 
-                            // If your data comes with (0,0) in the upper left corner of the actual field:
-                            const y = y_meters * scaleY; 
-
-                            // ONLY IF your data comes with (0,0) in the LOWER left corner (classic Cartesian system):
-                            // const y = canvas.height - (y_meters * scaleY);
-
-                            ctx.beginPath();
-                            ctx.arc(x, y, 8, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
+                        ctx.beginPath();
+                        ctx.arc(xm * scaleX, ym * scaleY, 8, 0, Math.PI * 2);
+                        ctx.fill();
                     });
 
-                    ctx.filter = "none";
+                    ctx.filter      = "none";
                     ctx.globalAlpha = 1.0;
                 }
 
@@ -1000,6 +1004,14 @@
                         txtSpeed.innerText = "--";
                         txtAccel.innerText = "--";
                         tagAccel.classList.add('hidden');
+
+                        // Reset chart title and clear the speed chart when viewing a team
+                        const chartTitleElem = document.getElementById('chart-title');
+                        if (chartTitleElem) chartTitleElem.innerText = 'Selecciona un jugador para ver su velocidad';
+                        if (window.speedChartInstance) {
+                            window.speedChartInstance.destroy();
+                            window.speedChartInstance = null;
+                        }
 
                     }
                     // Player mode
@@ -1032,15 +1044,24 @@
                                 tagAccel.innerText = "NORMAL";
                             }
 
-                            // --- INICIO NUEVO CÓDIGO DE LA GRÁFICA DINÁMICA ---
+                            // Update chart title to reflect the selected player
+                            const chartTitleElem = document.getElementById('chart-title');
+                            if (chartTitleElem) chartTitleElem.innerText = `Velocidad del Jugador #${playerId} durante el clip`;
+
                             if (window.speedChartInstance) {
                                 window.speedChartInstance.destroy();
+                                window.speedChartInstance = null;
                             }
-                            
+
                             const ctxSpeed = document.getElementById('speedChart').getContext('2d');
-                            // Generamos las etiquetas de tiempo (0s, 1s, 2s...) según los datos reales
+                            // speed_over_time is sampled once per second (every fps frames),
+                            // so index i == i seconds into the clip.
                             const labels = p.speed_over_time.map((_, i) => `${i}s`);
-                            
+                            // Filter nulls before computing max to avoid NaN.
+                            const validSpeeds = p.speed_over_time.filter(v => v !== null && v !== undefined);
+                            const dataMax = validSpeeds.length ? Math.max(...validSpeeds) : 0;
+                            const yMax = Math.max(40, Math.ceil(dataMax / 5) * 5 + 5);
+
                             window.speedChartInstance = new Chart(ctxSpeed, {
                                 type: 'line',
                                 data: {
@@ -1051,20 +1072,38 @@
                                         borderColor: '#FBBF24',
                                         backgroundColor: 'rgba(251, 191, 36, 0.1)',
                                         tension: 0.4,
-                                        fill: true
+                                        fill: true,
+                                        spanGaps: false,
+                                        pointRadius: p.speed_over_time.length > 60 ? 0 : 3,
                                     }]
                                 },
-                                options: { 
-                                    responsive: true, 
+                                options: {
+                                    responsive: true,
                                     maintainAspectRatio: false,
                                     scales: {
-                                        y: { grid: { color: '#374151' }, ticks: { color: '#9CA3AF' } },
-                                        x: { grid: { display: false }, ticks: { color: '#9CA3AF' } }
+                                        y: {
+                                            min: 0,
+                                            max: yMax,
+                                            grid: { color: '#374151' },
+                                            ticks: {
+                                                color: '#9CA3AF',
+                                                callback: v => `${v} km/h`
+                                            },
+                                            title: { display: true, text: 'km/h', color: '#6B7280', font: { size: 10 } }
+                                        },
+                                        x: {
+                                            grid: { display: false },
+                                            ticks: {
+                                                color: '#9CA3AF',
+                                                maxTicksLimit: 15,
+                                                maxRotation: 0,
+                                            },
+                                            title: { display: true, text: 'Tiempo', color: '#6B7280', font: { size: 10 } }
+                                        }
                                     },
                                     plugins: { legend: { display: false } }
                                 }
                             });
-                            // --- FIN NUEVO CÓDIGO DE LA GRÁFICA DINÁMICA ---
 
                         } // Fin del if (p)
                     } // Fin del Player mode
@@ -1102,9 +1141,12 @@
                 // F. Listeners
                 if (selector) {
                     selector.addEventListener('change', (e) => updateDashboard(e.target.value));
-                    // Initiate with team 2 (Local / Green) Tends to be protagonist in videos, so good for demo
                     selector.value = "team2";
-                    updateDashboard("team2");
+                    // Defer the first draw until after the browser has painted the layout.
+                    // If called synchronously here, canvas.offsetWidth may still be 0
+                    // (the element exists but hasn't been sized by the CSS engine yet),
+                    // which collapses all heatmap points to (0,0) → top-left corner.
+                    requestAnimationFrame(() => updateDashboard("team2"));
                 }
 
                 // G. Posesion
