@@ -91,20 +91,33 @@ class ViewTransformer():
                 self.matrices_por_frame[frame_num] = self.ultima_matriz_valida
     
     # MODIFICACIÓN: Ahora la función necesita saber en qué frame estamos (frame_num)
-    def transform_point(self, point, frame_num):
-        # 1. Buscamos la matriz exacta que se calculó para ESTE frame en el paso anterior
+    def transform_point(self, point, frame_num,
+                        _x_min=-5.0, _x_max=110.0, _y_min=-5.0, _y_max=73.0):
+        """
+        Transform a pixel coordinate to real-world meters using the per-frame homography.
+
+        Returns None (instead of garbage values) when:
+          - No homography matrix exists for this frame.
+          - The homography is degraded (recycled from a camera-pan frame) and produces
+            coordinates far outside the pitch.  Values like [975, 568] (pixel-space
+            leakage) or [-628, -345] (inverted/degenerate matrix) are silently rejected
+            here so they never reach downstream consumers (exporter, heatmap, ball filter).
+        """
         matriz_actual = self.matrices_por_frame.get(frame_num)
-        
-        # Si por algún motivo no hay matriz (ej: inicio del video y no se ve el campo), abortamos
         if matriz_actual is None:
             return None
 
-        # 2. Aplicamos la transformación matemática de píxeles a metros
-        p = (int(point[0]), int(point[1]))
         reshaped_point = np.array(point).reshape(-1, 1, 2).astype(np.float32)
-        transform_point = cv2.perspectiveTransform(reshaped_point, matriz_actual)
-        
-        return transform_point.reshape(-1, 2)
+        result = cv2.perspectiveTransform(reshaped_point, matriz_actual)
+        result = result.reshape(-1, 2)
+
+        # Bounds guard: reject degenerate homography outputs.
+        # A valid pitch position is within [−5, 110] m × [−5, 73] m (FIFA 105×68 + margin).
+        x, y = float(result[0, 0]), float(result[0, 1])
+        if not (_x_min <= x <= _x_max and _y_min <= y <= _y_max):
+            return None
+
+        return result
 
     def add_transformed_position_to_tracks(self, tracks):
         # Iterate over all objects (ball, players) and add their position in meters

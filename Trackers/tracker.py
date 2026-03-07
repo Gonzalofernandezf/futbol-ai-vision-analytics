@@ -118,15 +118,52 @@ class Tracker:
                         "position": position 
                         }
 
+            # --- BALL DETECTION: pick best candidate per frame ---
+            # Problems with the naive loop:
+            #   1. Multiple "ball" detections (real ball + sock + pitch stain) all get
+            #      written to key 1, so the LAST one (lowest confidence, since YOLO sorts
+            #      desc) overwrites the real ball.
+            #   2. No geometry check → elongated sock boxes or large stain boxes pass.
+            #   3. No ball-specific confidence gate → conf=0.35 is too permissive.
+            # Fix: collect all candidates, apply shape/confidence gates, keep best conf.
+            import config as _cfg
+            best_ball_conf = -1
+            best_ball_entry = None
+
             for frame_detection in detection_supervision:
                 bbox = frame_detection[0].tolist()
                 cls_id = frame_detection[3]
-                if cls_id == cls_names_inv['ball']:
-                    position = ( (bbox[0] + bbox[2])/2, bbox[3] )
-                    tracks["ball"][frame_num][1] = {
-                        "bbox": bbox, 
-                        "position": position 
-                        }
+                conf  = float(frame_detection[2]) if frame_detection[2] is not None else 0.0
+
+                if cls_id != cls_names_inv['ball']:
+                    continue
+
+                # Gate 1: minimum confidence for ball (higher than player gate)
+                if conf < _cfg.BALL_MIN_CONF:
+                    continue
+
+                # Gate 2: size — ball cannot be large (socks, stains, heads are bigger)
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+                if w > _cfg.BALL_MAX_BBOX_PX or h > _cfg.BALL_MAX_BBOX_PX:
+                    continue
+
+                # Gate 3: shape — ball is roughly square; socks are tall, stains are flat
+                aspect = w / h if h > 0 else 999
+                if aspect < _cfg.BALL_MIN_ASPECT or aspect > _cfg.BALL_MAX_ASPECT:
+                    continue
+
+                # Keep the highest-confidence detection that passed all gates
+                if conf > best_ball_conf:
+                    best_ball_conf = conf
+                    best_ball_entry = {
+                        "bbox": bbox,
+                        "position": ((bbox[0] + bbox[2]) / 2, bbox[3]),
+                        "confidence": conf,
+                    }
+
+            if best_ball_entry is not None:
+                tracks["ball"][frame_num][1] = best_ball_entry
 
         if stub_path is not None:
             with open(stub_path, 'wb') as f:
@@ -210,7 +247,6 @@ class Tracker:
             for track_id, player in player_dict.items():
                 # Retrieve the color computed by Main. If not found, use red as a fallback.
                 color = player.get("team_color", (0, 0, 255))
-                
                 # Now pass that 'color' variable instead of the fixed one
                 frame = self.draw_ellipse(frame, player["bbox"], color, track_id)
 
@@ -280,6 +316,87 @@ class Tracker:
                 }
 
         return ball_positions_interpolated
+
+    def filter_ball_positions_by_speed(self, ball_tracks, fps, max_speed_mps=55.0,
+                                       pitch_length=105.0, pitch_width=68.0, pitch_margin=5.0):
+        """
+        Two-stage ball false-positive filter using real-world meter coordinates.
+
+        Stage A — Pitch bounds guard
+            Any detection whose position_transformed falls outside the pitch rectangle
+            (plus a small margin) is removed immediately.  "Sky" and stands false
+            positives always land far outside the field in homography space.
+            Critically, this prevents a sky false-positive from becoming the speed-filter
+            anchor and then rejecting all real subsequent detections.
+
+        Stage B — Speed plausibility guard
+            Consecutive detections that imply the ball travelled faster than
+            max_speed_mps are removed.  The anchor is only updated by detections that
+            passed Stage A AND are reachable from the previous valid position.
+
+        Must be called AFTER view_transformer.add_transformed_position_to_tracks()
+        so that 'position_transformed' is present in each track entry.
+
+        Args:
+            ball_tracks (list[dict]): Per-frame ball track dicts (tracks["ball"]).
+            fps (float): Video frame rate.
+            max_speed_mps (float): Max allowed speed in m/s (default 55 ≈ 200 km/h).
+            pitch_length (float): Pitch length in metres (default 105).
+            pitch_width (float): Pitch width in metres (default 68).
+            pitch_margin (float): Tolerance beyond pitch edge before discarding (default 5 m).
+
+        Returns:
+            list[dict]: Filtered ball_tracks.
+        """
+        max_dist_per_frame = max_speed_mps / fps
+        x_min = -pitch_margin
+        x_max = pitch_length + pitch_margin
+        y_min = -pitch_margin
+        y_max = pitch_width  + pitch_margin
+
+        last_valid_frame = None
+        last_valid_pos   = None
+        removed_bounds   = 0
+        removed_speed    = 0
+
+        for frame_num, frame_ball in enumerate(ball_tracks):
+            if not frame_ball or 1 not in frame_ball:
+                continue
+
+            pos_transformed = frame_ball[1].get('position_transformed')
+            if pos_transformed is None:
+                # No homography for this frame — skip, don't update anchor
+                continue
+
+            pos = np.array(pos_transformed, dtype=float).flatten()
+
+            # --- Stage A: pitch bounds ---
+            px, py = pos[0], pos[1]
+            if not (x_min <= px <= x_max and y_min <= py <= y_max):
+                ball_tracks[frame_num] = {}
+                removed_bounds += 1
+                continue
+
+            # --- Stage B: speed plausibility ---
+            if last_valid_pos is not None:
+                frames_elapsed = frame_num - last_valid_frame
+                dist           = np.linalg.norm(pos - last_valid_pos)
+                max_allowed    = max_dist_per_frame * frames_elapsed
+
+                if dist > max_allowed:
+                    ball_tracks[frame_num] = {}
+                    removed_speed += 1
+                    continue  # Don't update anchor — wait for next reachable detection
+
+            last_valid_pos   = pos
+            last_valid_frame = frame_num
+
+        total = removed_bounds + removed_speed
+        if total > 0:
+            print(f"⚽ Ball filter: removed {removed_bounds} out-of-bounds + "
+                  f"{removed_speed} speed-jump frames (limit {max_speed_mps} m/s)")
+
+        return ball_tracks
 
     def draw_team_ball_control(self, frame, frame_num, team_ball_control):
         # 1. Transparent overlay (same as before)
