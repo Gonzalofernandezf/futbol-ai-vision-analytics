@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FutbolAI - Plataforma de Análisis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .active-nav {
+            background-color: #10B981;
+            color: white;
+        }
+
+        /* Soft animation */
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-gray-800 flex flex-col shadow-lg">
+        <div class="h-16 flex items-center justify-center border-b border-gray-700">
+            <h1 class="text-2xl font-bold text-green-400"><i class="fas fa-futbol mr-2"></i>FutbolAI</h1>
+        </div>
+        <nav class="flex-1 px-2 py-4 space-y-2">
+            <button onclick="showSection('dashboard')" id="btn-dashboard"
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-gray-700 active-nav text-left">
+                <i class="fas fa-chart-line w-6"></i> Dashboard
+            </button>
+            <button onclick="showSection('videolab')" id="btn-videolab"
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-gray-700 text-left">
+                <i class="fas fa-video w-6"></i> Video Análisis
+            </button>
+            <button onclick="showSection('scouting')" id="btn-scouting"
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-gray-700 text-left">
+                <i class="fas fa-search w-6"></i> Scouting & Fichajes
+            </button>
+            <button onclick="showSection('rivals')" id="btn-rivals"
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-gray-700 text-left">
+                <i class="fas fa-chess-board w-6"></i> Análisis de Rivales
+            </button>
+        </nav>
+        <div class="p-4 border-t border-gray-700">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center font-bold text-white">
+                    DT</div>
+                <div>
+                    <p class="text-sm font-medium">Mister Analista</p>
+                    <p class="text-xs text-gray-400">Head Coach</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-y-auto bg-gray-900 p-8">
+
+        <div id="dashboard-section" class="fade-in">
+            <h2 class="text-3xl font-bold mb-6">Resumen de la Temporada</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                    <p class="text-gray-400 text-sm">Posesión Media</p>
+                    <p class="text-3xl font-bold">58%</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+                    <p class="text-gray-400 text-sm">Distancia Recorrida (Km)</p>
+                    <p class="text-3xl font-bold">112.4</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
+                    <p class="text-gray-400 text-sm">Pases Completados</p>
+                    <p class="text-3xl font-bold">450</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-red-500">
+                    <p class="text-gray-400 text-sm">Velocidad Punta</p>
+                    <p class="text-3xl font-bold">34.2 km/h</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4">Rendimiento Físico vs Técnico</h3>
+                    <canvas id="teamChart"></canvas>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4">Zonas de Influencia</h3>
+                    <div
+                        class="relative h-64 bg-green-800 rounded-lg flex items-center justify-center overflow-hidden border border-white/20">
+                        <div
+                            class="absolute inset-0 opacity-30 bg-[url('https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Soccer_Field_Transparant.svg/1200px-Soccer_Field_Transparant.svg.png')] bg-cover bg-center">
+                        </div>
+                        <div class="absolute top-1/2 left-1/3 w-24 h-24 bg-red-500 rounded-full blur-xl opacity-60">
+                        </div>
+                        <div class="absolute top-1/3 right-1/3 w-32 h-32 bg-yellow-500 rounded-full blur-xl opacity-50">
+                        </div>
+                        <p class="relative z-10 font-bold text-shadow">Mapa de Calor (Generado por IA)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="videolab-section" class="hidden fade-in">
+            <h2 class="text-3xl font-bold mb-2">Video Análisis IA</h2>
+            <p class="text-gray-400 mb-6">Procesado con YOLOv8 + Supervision (Tu Código Python)</p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-700">
+                    <video controls class="w-full h-auto" autoplay muted loop>
+                        <source src="demo_video.mp4" type="video/mp4">
+                        Tu navegador no soporta video.
+                    </video>
+                    <div class="p-4 bg-gray-800 flex justify-between items-center">
+                        <div>
+                            <span class="text-green-400 font-bold">● LIVE TRACKING</span>
+                            <span class="ml-4 text-sm text-gray-300">Model: best_100e.pt</span>
+                        </div>
+                        <button class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm font-bold">Exportar
+                            Datos CSV</button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-xl h-full flex flex-col shadow-2xl border border-gray-700">
+
+                    <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
+                        <div>
+                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                                <i class="fas fa-sliders-h text-emerald-400"></i> Análisis Táctico
+                            </h2>
+                            <p class="text-xs text-gray-400 mt-1">Selecciona unidad de análisis</p>
+                        </div>
+
+                        <select id="player-selector"
+                            class="bg-gray-900 text-white text-sm rounded-lg px-3 py-2 border border-gray-600 focus:border-emerald-500 outline-none">
+                            <option value="team1">🛡️ Local (Stats)</option>
+                            <option value="team2">⚔️ Visitante (Stats)</option>
+                            <optgroup label="Jugadores" id="selector-players-list">
+                                <option>Cargando...</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <div class="space-y-6 mb-4">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm text-gray-400">Posesión Equipo</span>
+                                <span id="possession-text" class="text-sm font-bold text-green-400">--%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div id="possession-bar" class="bg-green-500 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-700/30 p-4 rounded-lg border border-gray-600">
+                            <div class="flex items-center gap-4">
+                                <div id="mvp-badge"
+                                    class="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center font-bold text-white transition-all">
+                                    --</div>
+                                <div>
+                                    <p class="text-xs text-gray-400 uppercase font-bold">Velocidad Máxima</p>
+                                    <p id="mvp-speed" class="text-2xl text-yellow-400 font-mono font-bold">-- km/h</p>
+
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <p class="text-xs text-gray-400">Acel:</p>
+                                        <p id="mvp-accel" class="text-sm font-bold text-white">-- m/s²</p>
+                                        <span id="accel-tag"
+                                            class="hidden text-[10px] px-1 rounded bg-gray-600">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto pt-4 border-t border-gray-700">
+                        <p class="text-xs text-gray-400 uppercase font-bold mb-2 flex justify-between">
+                            <span>Mapa de Calor</span>
+                            <span class="text-emerald-500 text-[10px] bg-emerald-900/30 px-2 rounded">LIVE DATA</span>
+                        </p>
+                        <div
+                            class="relative w-full aspect-[105/68] bg-green-900 rounded-lg overflow-hidden border border-green-700 shadow-inner group">
+                            <div class="absolute inset-0 bg-green-800 opacity-80">
+                                <svg width="100%" height="100%" viewBox="0 0 105 68" preserveAspectRatio="none">
+                                    <rect width="105" height="68" fill="#15803d" />
+
+                                    <g stroke="white" stroke-width="0.5" fill="none" opacity="0.6">
+                                        <rect x="0" y="0" width="105" height="68" />
+                                        <line x1="52.5" y1="0" x2="52.5" y2="68" />
+                                        <circle cx="52.5" cy="34" r="9.15" />
+
+                                        <rect x="0" y="13.84" width="16.5" height="40.32" />
+                                        <rect x="0" y="24.84" width="5.5" height="18.32" />
+
+                                        <rect x="88.5" y="13.84" width="16.5" height="40.32" />
+                                        <rect x="99.5" y="24.84" width="5.5" height="18.32" />
+                                    </g>
+                                </svg>
+                            </div>
+
+                            <canvas id="heatmap-canvas" class="absolute inset-0 w-full h-full z-10"></canvas>
+
+                            <div class="absolute bottom-2 right-2 text-[10px] text-white/50 bg-black/50 px-2 rounded">
+                                Field: 105x68m</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="mt-8 bg-gray-800 p-6 rounded-xl h-64">
+                <h3 id="chart-title" class="font-bold mb-4">Velocidad del Jugador -- durante el clip</h3>
+                <canvas id="speedChart" height="50"></canvas>
+            </div>
+        </div>
+
+        <div id="scouting-section" class="hidden fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold">Base de Datos de Talentos</h2>
+                <div class="flex gap-2">
+                    <input type="text" placeholder="Buscar jugador..."
+                        class="bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <button onclick="toggleModal('filter-modal')"
+                        class="bg-green-600 px-4 py-2 rounded-lg hover:bg-green-700 shadow-lg hover:shadow-green-500/50 transition">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl overflow-hidden shadow-lg">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-700 text-gray-300">
+                        <tr>
+                            <th class="p-4">Jugador</th>
+                            <th class="p-4">Posición</th>
+                            <th class="p-4">Edad</th>
+                            <th class="p-4">Velocidad Max</th>
+                            <th class="p-4">Estado</th>
+                            <th class="p-4">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700">
+                        <tr class="hover:bg-gray-700/50 transition">
+                            <td class="p-4 flex items-center gap-3">
+                                <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-xs">
+                                    MB</div>
+                                <span class="font-bold">Mbappé Jr.</span>
+                            </td>
+                            <td class="p-4">Delantero</td>
+                            <td class="p-4">19</td>
+                            <td class="p-4 text-green-400 font-bold">36.5 km/h</td>
+                            <td class="p-4"><span
+                                    class="bg-green-900 text-green-300 px-2 py-1 rounded text-xs">Disponible</span></td>
+                            <td class="p-4"><button class="text-blue-400 hover:text-white">Ver Análisis</button></td>
+                        </tr>
+                        <tr class="hover:bg-gray-700/50 transition">
+                            <td class="p-4 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-xs text-black">
+                                    PD</div>
+                                <span class="font-bold">Pedri Clone</span>
+                            </td>
+                            <td class="p-4">Medio</td>
+                            <td class="p-4">21</td>
+                            <td class="p-4">29.1 km/h</td>
+                            <td class="p-4"><span
+                                    class="bg-red-900 text-red-300 px-2 py-1 rounded text-xs">Lesionado</span></td>
+                            <td class="p-4"><button class="text-blue-400 hover:text-white">Ver Análisis</button></td>
+                        </tr>
+                        <tr class="hover:bg-gray-700/50 transition">
+                            <td class="p-4 flex items-center gap-3">
+                                <div
+                                    class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-xs">
+                                    CR</div>
+                                <span class="font-bold">New Ronaldo</span>
+                            </td>
+                            <td class="p-4">Extremo</td>
+                            <td class="p-4">18</td>
+                            <td class="p-4 text-yellow-400 font-bold">33.2 km/h</td>
+                            <td class="p-4"><span
+                                    class="bg-yellow-900 text-yellow-300 px-2 py-1 rounded text-xs">Ojeando</span></td>
+                            <td class="p-4"><button class="text-blue-400 hover:text-white">Ver Análisis</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="rivals-section" class="hidden fade-in">
+            <h2 class="text-3xl font-bold mb-6">Próximos Enfrentamientos</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <div onclick="openRivalModal(0)"
+                    class="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg border border-gray-600 cursor-pointer hover:scale-105 transition transform group">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">PRÓXIMO</span>
+                        <span class="text-gray-400 text-sm"><i class="far fa-calendar-alt mr-1"></i> Domingo,
+                            21:00</span>
+                    </div>
+                    <div class="flex flex-col items-center mb-6">
+                        <div
+                            class="w-20 h-20 bg-white rounded-full flex items-center justify-center text-3xl font-bold text-gray-800 shadow-lg mb-3">
+                            RM</div>
+                        <h3 class="text-xl font-bold">Real Madrid</h3>
+                        <p class="text-gray-400 text-sm">Santiago Bernabéu</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm"><span>Probabilidad Victoria</span> <span
+                                class="font-bold text-green-400">32%</span></div>
+                        <div class="w-full bg-gray-900 rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: 32%"></div>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <span class="text-blue-400 text-sm group-hover:text-white transition">Ver Informe Táctico <i
+                                class="fas fa-arrow-right ml-1"></i></span>
+                    </div>
+                </div>
+
+                <div onclick="openRivalModal(1)"
+                    class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 cursor-pointer hover:bg-gray-750 hover:border-gray-500 transition">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="bg-gray-600 text-gray-300 text-xs font-bold px-2 py-1 rounded">JORNADA 12</span>
+                        <span class="text-gray-400 text-sm">28 Oct</span>
+                    </div>
+                    <div class="flex flex-col items-center mb-6">
+                        <div
+                            class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-red-700 shadow-md mb-3">
+                            ATM</div>
+                        <h3 class="text-lg font-bold">Atlético Madrid</h3>
+                        <p class="text-gray-400 text-sm">Casa</p>
+                    </div>
+                    <div class="text-center mt-4 border-t border-gray-700 pt-4">
+                        <p class="text-xs text-gray-400 uppercase">Estilo Detectado</p>
+                        <p class="font-bold text-yellow-400">Bloque Bajo / Contra</p>
+                    </div>
+                </div>
+
+                <div onclick="openRivalModal(2)"
+                    class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 cursor-pointer hover:bg-gray-750 hover:border-gray-500 transition">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="bg-gray-600 text-gray-300 text-xs font-bold px-2 py-1 rounded">JORNADA 13</span>
+                        <span class="text-gray-400 text-sm">04 Nov</span>
+                    </div>
+                    <div class="flex flex-col items-center mb-6">
+                        <div
+                            class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-blue-800 shadow-md mb-3">
+                            RSO</div>
+                        <h3 class="text-lg font-bold">Real Sociedad</h3>
+                        <p class="text-gray-400 text-sm">Visitante</p>
+                    </div>
+                    <div class="text-center mt-4 border-t border-gray-700 pt-4">
+                        <p class="text-xs text-gray-400 uppercase">Estilo Detectado</p>
+                        <p class="font-bold text-blue-400">Posesión Alta</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <div id="filter-modal"
+        class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center fade-in">
+        <div class="bg-gray-800 rounded-xl w-full max-w-2xl border border-gray-600 shadow-2xl p-6 relative">
+            <button onclick="toggleModal('filter-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+
+            <h3 class="text-2xl font-bold mb-6 text-green-400"><i class="fas fa-sliders-h mr-2"></i>Filtrar Talentos
+            </h3>
+
+            <form id="scouting-form" onsubmit="event.preventDefault(); performSearch();">
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Posición</label>
+                        <select class="w-full bg-gray-700 rounded p-2 text-white focus:ring-2 focus:ring-green-500">
+                            <option value="">Cualquiera</option>
+                            <option value="del">Delantero</option>
+                            <option value="med">Mediocentro</option>
+                            <option value="def">Defensa</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Género</label>
+                        <select class="w-full bg-gray-700 rounded p-2 text-white">
+                            <option value="m">Masculino</option>
+                            <option value="f">Femenino</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Edad Máxima</label>
+                        <input type="number" placeholder="Ej: 23" class="w-full bg-gray-700 rounded p-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Valor de Mercado (M€)</label>
+                        <input type="range" min="0" max="100"
+                            class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>0M</span><span>50M</span><span>100M+</span>
+                        </div>
+                    </div>
+
+                    <div class="col-span-2 border-t border-gray-700 pt-4 mt-2">
+                        <p class="text-green-400 font-bold mb-3 text-sm">Métricas de Rendimiento (IA)</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">% Regates Completados</label>
+                        <input type="number" placeholder="Min %" class="w-full bg-gray-700 rounded p-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Velocidad Punta (km/h)</label>
+                        <input type="number" placeholder="Min km/h" class="w-full bg-gray-700 rounded p-2 text-white">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="toggleModal('filter-modal')"
+                        class="px-4 py-2 text-gray-300 hover:text-white">Cancelar</button>
+                    <button type="submit"
+                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg transform hover:scale-105 transition">
+                        <i class="fas fa-search mr-2"></i>Buscar Talentos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="player-modal"
+        class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center fade-in backdrop-blur-sm">
+        <div
+            class="bg-gray-900 rounded-xl w-full max-w-4xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+
+            <div class="w-full md:w-1/3 bg-gray-800 p-6 flex flex-col items-center border-r border-gray-700">
+                <div class="w-32 h-32 rounded-full bg-gradient-to-tr from-green-400 to-blue-500 p-1 mb-4">
+                    <img id="pm-img" src="" class="w-full h-full rounded-full object-cover border-4 border-gray-900">
+                </div>
+                <h2 id="pm-name" class="text-2xl font-bold text-white mb-1">Nombre Jugador</h2>
+                <p id="pm-pos" class="text-green-400 font-medium mb-6">Posición</p>
+
+                <div class="w-full space-y-4">
+                    <div class="bg-gray-700/50 p-3 rounded-lg text-center">
+                        <p class="text-xs text-gray-400">Valor de Mercado</p>
+                        <p id="pm-value" class="text-xl font-bold text-white">€0M</p>
+                    </div>
+                    <div class="bg-gray-700/50 p-3 rounded-lg text-center">
+                        <p class="text-xs text-gray-400">Edad</p>
+                        <p id="pm-age" class="text-xl font-bold text-white">0 años</p>
+                    </div>
+                </div>
+
+                <button onclick="toggleModal('player-modal')" class="mt-auto text-gray-500 hover:text-white pt-6">Cerrar
+                    Ficha</button>
+            </div>
+
+            <div class="w-full md:w-2/3 p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-white">Análisis Biomecánico & IA</h3>
+                    <span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded border border-green-700">Match
+                        98%</span>
+                </div>
+
+                <div class="bg-blue-900/30 border border-blue-500/30 p-4 rounded-lg mb-8 flex gap-4">
+                    <div class="text-blue-400 text-2xl"><i class="fas fa-robot"></i></div>
+                    <div>
+                        <h4 class="font-bold text-blue-200 text-sm mb-1">AI INSIGHT GENERATOR</h4>
+                        <p id="pm-comparison" class="text-gray-300 text-sm italic">...</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-gray-400 text-sm mb-4 font-bold uppercase">Radar de Habilidades</h4>
+                        <div class="relative h-48 w-full">
+                            <canvas id="playerRadarChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <h4 class="text-gray-400 text-sm mb-2 font-bold uppercase">Métricas Físicas</h4>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span>Velocidad Punta</span> <span
+                                    class="text-white font-bold">34.2 km/h</span></div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 90%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span>Aceleración (0-5m)</span> <span
+                                    class="text-white font-bold">Elite</span></div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 95%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span>Resistencia</span> <span
+                                    class="text-white font-bold">Alta</span></div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: 75%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="rival-modal"
+        class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center fade-in backdrop-blur-sm">
+        <div
+            class="bg-gray-900 rounded-xl w-full max-w-5xl border border-gray-600 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+            <div class="bg-gray-800 p-6 border-b border-gray-700 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <div id="rm-logo"
+                        class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl font-bold text-black">
+                        ?</div>
+                    <div>
+                        <h2 id="rm-name" class="text-2xl font-bold text-white">Nombre Rival</h2>
+                        <p id="rm-style" class="text-green-400 font-medium">Estilo: Desconocido</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('rival-modal')" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                <div class="space-y-6">
+                    <div class="bg-blue-900/20 border border-blue-500/30 p-5 rounded-xl">
+                        <h3 class="text-blue-300 font-bold mb-3"><i class="fas fa-brain mr-2"></i>Análisis IA: Patrones
+                            de Juego</h3>
+                        <p id="rm-analysis" class="text-gray-300 text-sm leading-relaxed">
+                            Análisis detallado...
+                        </p>
+                    </div>
+
+                    <div>
+                        <h4 class="text-gray-400 text-xs font-bold uppercase mb-3">Jugadores Clave a Vigilar</h4>
+                        <div id="rm-key-players" class="space-y-3">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+
+                    <div class="bg-gray-800 p-5 rounded-xl">
+                        <h4 class="text-white font-bold mb-4">Zonas de Vulnerabilidad Defensiva</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-xs mb-1"><span>Espalda de Laterales</span> <span
+                                        class="text-red-400 font-bold">Alta</span></div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-red-500 h-2 rounded-full" style="width: 85%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1"><span>Balón Parado Defensivo</span> <span
+                                        class="text-yellow-400 font-bold">Media</span></div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-yellow-500 h-2 rounded-full" style="width: 50%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1"><span>Carril Central</span> <span
+                                        class="text-green-400 font-bold">Baja (Sólido)</span></div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 20%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-800 p-4 rounded-lg text-center">
+                            <p class="text-xs text-gray-400">Km Recorridos (Media)</p>
+                            <p id="rm-km" class="text-2xl font-bold text-white">108 km</p>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-lg text-center">
+                            <p class="text-xs text-gray-400">Intensidad (Sprints)</p>
+                            <p id="rm-sprints" class="text-2xl font-bold text-yellow-400">Alta</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-4 border-t border-gray-700 flex justify-end">
+                <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">Descargar Informe
+                    PDF</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // 1. Navigation systems (TABS)
+        function showSection(sectionId) {
+            document.querySelectorAll('main > div').forEach(div => div.classList.add('hidden'));
+            document.querySelectorAll('aside nav button').forEach(btn => btn.classList.remove('active-nav', 'bg-green-600'));
+
+            document.getElementById(sectionId + '-section').classList.remove('hidden');
+            document.getElementById('btn-' + sectionId).classList.add('active-nav');
+        }
+
+        // 2. Modal Systems (pop-ups)
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // 3. Mock data from 4 players
+        const mockPlayers = [
+            {
+                name: "Thiago Almada Jr.",
+                pos: "Mediapunta",
+                age: 19,
+                val: "€24M",
+                speed: "33.5 km/h",
+                img: "https://ui-avatars.com/api/?name=Thiago+A&background=10B981&color=fff",
+                comparison: "Su visión de juego en el último tercio coincide en un 94% con la de **Kevin De Bruyne** (2020), aunque con mayor agilidad en espacios cortos.",
+                stats: [88, 92, 65, 80, 75, 85] // Vel, Pas, Def, Tir, Fis, Reg
+            },
+            {
+                name: "Victor Osimhen II",
+                pos: "Delantero",
+                age: 21,
+                val: "€45M",
+                speed: "35.1 km/h",
+                img: "https://ui-avatars.com/api/?name=Victor+O&background=F59E0B&color=fff",
+                comparison: "🚀 **AI Insight:** Este jugador tiene la misma aceleración explosiva (35.1 km/h) y zancada que **Vinicius Jr.** en su temporada 2018.",
+                stats: [95, 70, 40, 88, 90, 82]
+            },
+            {
+                name: "Enzo F.",
+                pos: "Pivote",
+                age: 22,
+                val: "€30M",
+                speed: "29.8 km/h",
+                img: "https://ui-avatars.com/api/?name=Enzo+F&background=3B82F6&color=fff",
+                comparison: "Registra métricas de recuperación y distribución idénticas a **Sergio Busquets** en 2011, pero con mayor cobertura física.",
+                stats: [65, 95, 88, 70, 80, 85]
+            },
+            {
+                name: "Alphonso D.",
+                pos: "Lateral",
+                age: 18,
+                val: "€18M",
+                speed: "36.2 km/h",
+                img: "https://ui-avatars.com/api/?name=Alph+D&background=EF4444&color=fff",
+                comparison: "Su mapa de calor y velocidad punta superan al **Gareth Bale** del Tottenham. Potencial físico extremo.",
+                stats: [98, 75, 78, 65, 92, 80]
+            }
+        ];
+
+        // 4. Search functionality (Simulation)
+        function performSearch() {
+            // Cierra el modal
+            toggleModal('filter-modal');
+
+            // Search simulation
+            const tbody = document.querySelector('tbody');
+            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-green-400"><i class="fas fa-circle-notch fa-spin text-2xl"></i> Buscando en la base de datos IA...</td></tr>';
+
+            // Show the results after 1 second
+            setTimeout(() => {
+                let html = '';
+                mockPlayers.forEach((p, index) => {
+                    html += `
+                        <tr class="hover:bg-gray-700/50 transition cursor-pointer border-b border-gray-700" onclick="openPlayerCard(${index})">
+                            <td class="p-4 flex items-center gap-3">
+                                <img src="${p.img}" class="w-8 h-8 rounded-full">
+                                <span class="font-bold text-white">${p.name}</span>
+                            </td>
+                            <td class="p-4 text-gray-300">${p.pos}</td>
+                            <td class="p-4 text-gray-300">${p.age}</td>
+                            <td class="p-4 text-green-400 font-bold">${p.speed}</td>
+                            <td class="p-4"><span class="bg-green-900 text-green-300 px-2 py-1 rounded text-xs border border-green-700">98% Match</span></td>
+                            <td class="p-4"><button class="text-blue-400 hover:text-white font-medium text-sm">Ver Análisis <i class="fas fa-chevron-right ml-1"></i></button></td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            }, 800);
+        }
+
+        // 5. Open player card and radar chart
+        let radarChartInstance = null; // Save graph instance
+
+        function openPlayerCard(index) {
+            const player = mockPlayers[index];
+
+            // Rellenar textos
+            document.getElementById('pm-name').innerText = player.name;
+            document.getElementById('pm-pos').innerText = player.pos;
+            document.getElementById('pm-age').innerText = player.age + " años";
+            document.getElementById('pm-value').innerText = player.val;
+            document.getElementById('pm-img').src = player.img;
+            document.getElementById('pm-comparison').innerHTML = player.comparison; // We use innerHTML to allow boldformatting
+
+            // Show Modal
+            toggleModal('player-modal');
+
+            // Generate a radar graph (Delete previous if it exists)
+            if (radarChartInstance) {
+                radarChartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('playerRadarChart').getContext('2d');
+            radarChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Velocidad', 'Pase', 'Defensa', 'Tiro', 'Físico', 'Regate'],
+                    datasets: [{
+                        label: player.name,
+                        data: player.stats,
+                        backgroundColor: 'rgba(16, 185, 129, 0.4)', // green
+                        borderColor: '#10B981',
+                        pointBackgroundColor: '#fff',
+                        borderWidth: 2
+                    }, {
+                        label: 'Media Liga',
+                        data: [65, 70, 60, 65, 70, 65], // Generic average for comparison
+                        backgroundColor: 'rgba(107, 114, 128, 0.1)',
+                        borderColor: '#6B7280',
+                        borderWidth: 1,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            grid: { color: '#374151' },
+                            angleLines: { color: '#374151' },
+                            suggestedMin: 0,
+                            suggestedMax: 100,
+                            ticks: { display: false, backdropColor: 'transparent' },
+                            pointLabels: { color: '#9CA3AF', font: { size: 10 } }
+                        }
+                    },
+                    plugins: { legend: { labels: { color: '#D1D5DB' } } }
+                }
+            });
+        }
+
+        // 6. Dashboard graph initialization 
+        document.addEventListener("DOMContentLoaded", function () {
+            // Radar Graph (General Dashboard)
+            const ctxTeam = document.getElementById('teamChart').getContext('2d');
+            new Chart(ctxTeam, {
+                type: 'radar',
+                data: {
+                    labels: ['Velocidad', 'Pase', 'Defensa', 'Tiro', 'Físico', 'Táctica'],
+                    datasets: [{
+                        label: 'Nuestro Equipo',
+                        data: [85, 90, 75, 80, 88, 92],
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)', // Blue
+                        borderColor: '#3B82F6',
+                        pointBackgroundColor: '#fff'
+                    }]
+                },
+                options: {
+                    scales: { r: { grid: { color: '#374151' }, ticks: { display: false, backdropColor: 'transparent' } } },
+                    plugins: { legend: { labels: { color: 'white' } } }
+                }
+            });
+
+            
+        });
+        // Rivals logic
+        const mockRivals = [
+            {
+                name: "Real Madrid",
+                abbr: "RM",
+                style: "Contragolpe Letal",
+                km: "112.5 km",
+                sprints: "Muy Alta",
+                color: "text-gray-800", // For logo color
+                analysis: "El rival prioriza la solidez defensiva en bloque medio, buscando atraer la presión para lanzar a Vinicius y Rodrygo al espacio. **Punto débil:** Sufren en transiciones ataque-defensa si pierden el balón en carriles interiores. La IA ha detectado que el 60% de sus goles recibidos vienen por centros laterales rasos.",
+                players: [
+                    { name: "Vinicius Jr", role: "Extremo", note: "Velocidad punta 36km/h. Doblar marca." },
+                    { name: "Bellingham", role: "Todocampista", note: "Llega en 2ª línea. Vigilar frontal." }
+                ]
+            },
+            {
+                name: "Atlético Madrid",
+                abbr: "ATM",
+                style: "Bloque Bajo / Intensidad",
+                km: "118.2 km",
+                sprints: "Extrema",
+                color: "text-red-700",
+                analysis: "Sistema 5-3-2 muy compacto. Buscan forzar el error en salida de balón. Ofensivamente dependen de las subidas de los carrileros y el juego directo a sus puntas. **Oportunidad:** Dejan espacios a la espalda de los carrileros cuando saltan a la presión.",
+                players: [
+                    { name: "Griezmann", role: "Creador", note: "Flota entre líneas. No dejar girar." },
+                    { name: "Oblak", role: "Portero", note: "Sufre en balones cruzados al segundo palo." }
+                ]
+            },
+            {
+                name: "Real Sociedad",
+                abbr: "RSO",
+                style: "Posesión y Presión Alta",
+                km: "109.8 km",
+                sprints: "Media",
+                color: "text-blue-700",
+                analysis: "Equipo que quiere el balón. Realizan una presión tras pérdida asfixiante en los primeros 5 segundos. Si superamos esa primera línea, su defensa queda expuesta en 1 contra 1. **Clave:** Balones largos a la espalda de sus centrales lentos.",
+                players: [
+                    { name: "Kubo", role: "Extremo", note: "Regate corto peligroso. Orientar hacia fuera." },
+                    { name: "Zubimendi", role: "Pivote", note: "Eje del juego. Presionar su recepción." }
+                ]
+            }
+        ];
+
+        function openRivalModal(index) {
+            const rival = mockRivals[index];
+
+            // Fill basic data
+            document.getElementById('rm-name').innerText = rival.name;
+            document.getElementById('rm-logo').innerText = rival.abbr;
+            document.getElementById('rm-logo').className = `w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl font-bold shadow-lg ${rival.color}`;
+            document.getElementById('rm-style').innerText = "Estilo: " + rival.style;
+            document.getElementById('rm-km').innerText = rival.km;
+            document.getElementById('rm-sprints').innerText = rival.sprints;
+
+            // Fill analysis (with support for bold text simulation)
+            document.getElementById('rm-analysis').innerHTML = rival.analysis.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+
+            // Fill key players
+            const playersContainer = document.getElementById('rm-key-players');
+            playersContainer.innerHTML = ''; // Clear olddata
+
+            rival.players.forEach(p => {
+                playersContainer.innerHTML += `
+                    <div class="bg-gray-700/50 p-3 rounded flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-white">${p.name}</p>
+                            <p class="text-xs text-gray-400">${p.role}</p>
+                        </div>
+                        <div class="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-1 rounded border border-yellow-600/30">
+                            <i class="fas fa-exclamation-triangle mr-1"></i> ${p.note}
+                        </div>
+                    </div>
+                `;
+            });
+
+            toggleModal('rival-modal');
+        }
+
+    </script>
+
+    <script>
+        // 1. Navigation system (TABS)
+        function showSection(sectionId) {
+            document.querySelectorAll('main > div').forEach(div => {
+                if (div.id) div.classList.add('hidden');
+            });
+            document.querySelectorAll('aside nav button').forEach(btn => {
+                btn.classList.remove('active-nav', 'bg-green-600', 'text-white');
+                btn.classList.add('text-gray-300');
+            });
+
+            const section = document.getElementById(sectionId + '-section');
+            if (section) section.classList.remove('hidden');
+
+            const btn = document.getElementById('btn-' + sectionId);
+            if (btn) {
+                btn.classList.add('active-nav', 'bg-green-600', 'text-white');
+                btn.classList.remove('text-gray-300');
+            }
+
+            // Redraw heatmap after the section becomes visible so canvas.offsetWidth is
+            // correct.  Without this, navigating away and back leaves the canvas blank.
+            if (sectionId === 'dashboard' && typeof _lastHeatmapCall !== 'undefined' && _lastHeatmapCall) {
+                requestAnimationFrame(() => drawHeatmap(_lastHeatmapCall.positions, _lastHeatmapCall.color));
+            }
+        }
+
+        // 2. Advanced data logic
+        document.addEventListener("DOMContentLoaded", async function () {
+            console.log("🚀 Iniciando FutbolAI Dashboard v2.0...");
+
+            try {
+                // A. Load JSON data 
+                const response = await fetch('match_data.json');
+                if (!response.ok) throw new Error("No se encontró match_data.json");
+                const data = await response.json();
+                console.log("✅ Datos cargados:", data);
+
+                // B. DOM elements 
+                const selector = document.getElementById('player-selector');
+                const playersList = document.getElementById('selector-players-list');
+
+                const badge = document.getElementById('mvp-badge');
+                const txtSpeed = document.getElementById('mvp-speed');
+                const txtAccel = document.getElementById('mvp-accel');
+                const tagAccel = document.getElementById('accel-tag');
+
+                const canvas = document.getElementById('heatmap-canvas');
+                const ctx = canvas ? canvas.getContext('2d') : null;
+
+                // Define colors so it matches the video elipses 
+                const TEAM_COLORS = {
+                    1: {
+                        main: "#FFFFFF",              // White dots on the map
+                        bg: "bg-gray-100 text-black", // White ID circle with black text
+                        border: "border-gray-400",
+                        icon: "⚪"                     // Icon for drop-down
+                    },
+                    2: {
+                        main: "#00FF00",              // Green neonn dots on the map
+                        bg: "bg-green-600 text-white", // Green circle with white text
+                        border: "border-green-400",
+                        icon: "🟢"
+                    }
+                };
+
+                // C. Draw heatmap
+                // Stores the last draw call so we can replay it when the tab becomes visible.
+                let _lastHeatmapCall = null;
+
+                function drawHeatmap(positions, color) {
+                    if (!ctx || !canvas) return;
+
+                    // Cache for redraws triggered by tab switches.
+                    _lastHeatmapCall = { positions, color };
+
+                    // Use offsetWidth (reliable even before first paint) and fall back to a
+                    // sensible default.  clientWidth can return 0 when the canvas is hidden,
+                    // which would set scaleX = 0 and collapse all points to (0,0).
+                    const w = canvas.offsetWidth  || canvas.clientWidth  || 800;
+                    const h = canvas.offsetHeight || canvas.clientHeight || Math.round(w * 68 / 105);
+
+                    canvas.width  = w;
+                    canvas.height = h;
+
+                    const scaleX = w / 105;
+                    const scaleY = h / 68;
+
+                    ctx.fillStyle   = color;
+                    ctx.globalAlpha = 0.6;
+                    ctx.filter      = "blur(6px)";
+
+                    positions.forEach(pos => {
+                        // Skip nulls and non-arrays.
+                        if (!Array.isArray(pos) || pos.length < 2 || pos[0] === null) return;
+
+                        const xm = pos[0];
+                        const ym = pos[1];
+
+                        // Skip positions outside the pitch + a small 3 m margin.
+                        // Do NOT clamp: clamping silently maps garbage coords ([975,568] from
+                        // a degenerate homography) to pitch corners, creating false clusters.
+                        if (xm < -3 || xm > 108 || ym < -3 || ym > 71) return;
+
+                        ctx.beginPath();
+                        ctx.arc(xm * scaleX, ym * scaleY, 8, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                    ctx.filter      = "none";
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // D. Update dashboard based on selection
+                function updateDashboard(selection) {
+                    let positionsToDraw = [];
+                    let mainColor = "#FFFFFF";
+
+                    // Team mode
+                    if (selection === "team1" || selection === "team2") {
+                        const teamId = selection === "team1" ? 1 : 2;
+                        mainColor = TEAM_COLORS[teamId].main;
+
+                        Object.values(data.players).forEach(p => {
+                            if (p.team === teamId && p.position_history) {
+                                positionsToDraw = positionsToDraw.concat(p.position_history);
+                            }
+                        });
+
+                        // UI Updates
+                        badge.innerText = teamId === 1 ? "VIS" : "LOC";
+                        badge.className = `w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${TEAM_COLORS[teamId].bg} shadow-lg`;
+                        txtSpeed.innerText = "--";
+                        txtAccel.innerText = "--";
+                        tagAccel.classList.add('hidden');
+
+                        // Reset chart title and clear the speed chart when viewing a team
+                        const chartTitleElem = document.getElementById('chart-title');
+                        if (chartTitleElem) chartTitleElem.innerText = 'Selecciona un jugador para ver su velocidad';
+                        if (window.speedChartInstance) {
+                            window.speedChartInstance.destroy();
+                            window.speedChartInstance = null;
+                        }
+
+                    }
+                    // Player mode
+                    else {
+                        const playerId = selection;
+                        const p = data.players[playerId];
+
+                        if (p) {
+                            positionsToDraw = p.position_history || [];
+                            const teamId = p.team;
+                            mainColor = TEAM_COLORS[teamId].main;
+
+                            // UI Updates
+                            badge.innerText = `#${playerId}`;
+                            badge.className = `w-12 h-12 rounded-full flex items-center justify-center font-bold text-white border-2 ${TEAM_COLORS[teamId].border} bg-gray-700`;
+
+                            txtSpeed.innerText = `${p.max_speed_kmh} km/h`;
+                            txtAccel.innerText = `${p.max_acceleration_ms2 || 0} m/s²`;
+
+                            tagAccel.classList.remove('hidden');
+                            const accel = p.max_acceleration_ms2 || 0;
+                            if (accel > 4.0) {
+                                tagAccel.className = "text-[10px] px-2 py-1 rounded bg-purple-900 text-purple-200 border border-purple-500 font-bold";
+                                tagAccel.innerText = "ELITE";
+                            } else if (accel > 2.5) {
+                                tagAccel.className = "text-[10px] px-2 py-1 rounded bg-green-900 text-green-200 border border-green-500 font-bold";
+                                tagAccel.innerText = "ALTA";
+                            } else {
+                                tagAccel.className = "text-[10px] px-2 py-1 rounded bg-gray-600 text-gray-300";
+                                tagAccel.innerText = "NORMAL";
+                            }
+
+                            // Update chart title to reflect the selected player
+                            const chartTitleElem = document.getElementById('chart-title');
+                            if (chartTitleElem) chartTitleElem.innerText = `Velocidad del Jugador #${playerId} durante el clip`;
+
+                            if (window.speedChartInstance) {
+                                window.speedChartInstance.destroy();
+                                window.speedChartInstance = null;
+                            }
+
+                            const ctxSpeed = document.getElementById('speedChart').getContext('2d');
+                            // speed_over_time is sampled once per second (every fps frames),
+                            // so index i == i seconds into the clip.
+                            const labels = p.speed_over_time.map((_, i) => `${i}s`);
+                            // Filter nulls before computing max to avoid NaN.
+                            const validSpeeds = p.speed_over_time.filter(v => v !== null && v !== undefined);
+                            const dataMax = validSpeeds.length ? Math.max(...validSpeeds) : 0;
+                            const yMax = Math.max(40, Math.ceil(dataMax / 5) * 5 + 5);
+
+                            window.speedChartInstance = new Chart(ctxSpeed, {
+                                type: 'line',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: `Velocidad Jugador #${playerId} (km/h)`,
+                                        data: p.speed_over_time,
+                                        borderColor: '#FBBF24',
+                                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                                        tension: 0.4,
+                                        fill: true,
+                                        spanGaps: false,
+                                        pointRadius: p.speed_over_time.length > 60 ? 0 : 3,
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: {
+                                            min: 0,
+                                            max: yMax,
+                                            grid: { color: '#374151' },
+                                            ticks: {
+                                                color: '#9CA3AF',
+                                                callback: v => `${v} km/h`
+                                            },
+                                            title: { display: true, text: 'km/h', color: '#6B7280', font: { size: 10 } }
+                                        },
+                                        x: {
+                                            grid: { display: false },
+                                            ticks: {
+                                                color: '#9CA3AF',
+                                                maxTicksLimit: 15,
+                                                maxRotation: 0,
+                                            },
+                                            title: { display: true, text: 'Tiempo', color: '#6B7280', font: { size: 10 } }
+                                        }
+                                    },
+                                    plugins: { legend: { display: false } }
+                                }
+                            });
+
+                        } // Fin del if (p)
+                    } // Fin del Player mode
+
+                    drawHeatmap(positionsToDraw, mainColor);
+                }
+
+                // E. Fill list (Ordered)
+                if (playersList) {
+                    playersList.innerHTML = "";
+
+                    // DEBUG: See how many players there are in total on the console
+                    console.log("Total jugadores en JSON:", Object.keys(data.players).length);
+
+                    // Convert into array to order
+                    const sortedPlayers = Object.entries(data.players).sort(([, a], [, b]) => {
+                        // Order first by team, then by speed
+                        if (a.team !== b.team) return a.team - b.team;
+                        return b.max_speed_kmh - a.max_speed_kmh;
+                    });
+
+                    sortedPlayers.forEach(([pid, p]) => {
+                        const option = document.createElement('option');
+                        option.value = pid;
+                        
+                        // Fix: Use the dictionary TEAM_COLORS if exists, otherwise question mark
+                        // This ensures that if TEAM_COLORS[1] has the icon “⚪”, that one is used.
+                        const teamInfo = TEAM_COLORS[p.team] || { icon: "❓" };
+                        
+                        option.innerText = `${teamInfo.icon || "•"} #${pid} (${p.max_speed_kmh} km/h)`;
+                        playersList.appendChild(option);
+                    });
+                }
+
+                // F. Listeners
+                if (selector) {
+                    selector.addEventListener('change', (e) => updateDashboard(e.target.value));
+                    selector.value = "team2";
+                    // Defer the first draw until after the browser has painted the layout.
+                    // If called synchronously here, canvas.offsetWidth may still be 0
+                    // (the element exists but hasn't been sized by the CSS engine yet),
+                    // which collapses all heatmap points to (0,0) → top-left corner.
+                    requestAnimationFrame(() => updateDashboard("team2"));
+                }
+
+                // G. Posesion
+                if (data.match_meta) {
+                    const pos = data.match_meta.home_possession;
+                    const textElem = document.getElementById('possession-text');
+                    const barElem = document.getElementById('possession-bar');
+                    if (textElem) textElem.innerText = `${pos}%`;
+                    if (barElem) barElem.style.width = `${pos}%`;
+                }
+
+            } catch (error) {
+                console.error("Error crítico:", error);
+            }
+        });
+    </script>
+
+</body>
+
+</html>
