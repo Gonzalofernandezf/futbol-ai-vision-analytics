@@ -66,12 +66,12 @@ class ViewTransformer():
                 # Revisamos cada uno de los 13 puntos
                 for i, (xy, conf) in enumerate(zip(xy_coords, confianzas)):
                     # Si la IA está más de un 50% segura de que lo está viendo...
-                    if conf > 0.5: 
+                    if conf > 0.35:
                         pts_pixeles.append(xy) # Guardamos la coordenada del pixel
                         pts_metros.append(self.target_vertices_dict[i]) # Guardamos su medida real
-            
+
             # Las matemáticas requieren mínimo 4 puntos para calcular la perspectiva.
-            if len(pts_pixeles) >= 4:
+            if len(pts_pixeles) >= 3:
                 # Calculamos la matriz para ESTE frame específico
                 matriz, _ = cv2.findHomography(
                     np.array(pts_pixeles, dtype=np.float32), 
