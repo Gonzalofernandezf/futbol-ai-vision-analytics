@@ -49,8 +49,8 @@ BALL_MIN_ASPECT     = float(os.getenv("BALL_MIN_ASPECT",     "0.35"))  # min wid
 BALL_MAX_ASPECT     = float(os.getenv("BALL_MAX_ASPECT",     "2.80"))  # max width/height ratio (stains are wide & flat)
 
 # Pitch field dimensions for out-of-bounds guard (FIFA standard, meters)
-PITCH_LENGTH_M      = float(os.getenv("PITCH_LENGTH_M",      "105.0"))
-PITCH_WIDTH_M       = float(os.getenv("PITCH_WIDTH_M",       "68.0"))
+PITCH_LENGTH_M      = float(os.getenv("PITCH_LENGTH_M",      "100.0"))
+PITCH_WIDTH_M       = float(os.getenv("PITCH_WIDTH_M",       "64.0"))
 PITCH_MARGIN_M      = float(os.getenv("PITCH_MARGIN_M",      "5.0"))   # tolerance beyond edge before discarding
 
 # Visualization

@@ -32,9 +32,9 @@ class ViewTransformer():
         # Reemplaza tus 4 puntos fijos por los 13 puntos oficiales de tu esqueleto.
         # Las llaves (0, 1, 2...) deben coincidir con el orden que les diste en Roboflow.
         self.target_vertices_dict = {
-            0: [0.0, 13.84], 1: [16.5, 13.84], 2: [0.0, 54.16], 3: [16.5, 54.16], 4: [11.0, 34.0],
-            5: [52.5, 24.85], 6: [52.5, 34.0], 7: [52.5, 43.15],
-            8: [88.5, 13.84], 9: [105.0, 13.84], 10: [88.5, 54.16], 11: [105.0, 54.16], 12: [94.0, 34.0]
+            0: [0.0, 11.0],  1: [16.5, 11.0],  2: [0.0, 53.0],   3: [16.5, 53.0],  4: [11.0, 32.0],
+            5: [50.0, 22.85], 6: [50.0, 32.0],  7: [50.0, 41.15],
+            8: [83.5, 11.0],  9: [100.0, 11.0], 10: [83.5, 53.0], 11: [100.0, 53.0], 12: [89.0, 32.0]
         }
         
         # 3. Almacenamiento Dinámico
@@ -92,7 +92,7 @@ class ViewTransformer():
     
     # MODIFICACIÓN: Ahora la función necesita saber en qué frame estamos (frame_num)
     def transform_point(self, point, frame_num,
-                        _x_min=-5.0, _x_max=110.0, _y_min=-5.0, _y_max=73.0):
+                        _x_min=-5.0, _x_max=105.0, _y_min=-5.0, _y_max=69.0):
         """
         Transform a pixel coordinate to real-world meters using the per-frame homography.
 
@@ -112,7 +112,7 @@ class ViewTransformer():
         result = result.reshape(-1, 2)
 
         # Bounds guard: reject degenerate homography outputs.
-        # A valid pitch position is within [−5, 110] m × [−5, 73] m (FIFA 105×68 + margin).
+        # A valid pitch position is within [−5, 105] m × [−5, 69] m (100×64 + 5m margin).
         x, y = float(result[0, 0]), float(result[0, 1])
         if not (_x_min <= x <= _x_max and _y_min <= y <= _y_max):
             return None
