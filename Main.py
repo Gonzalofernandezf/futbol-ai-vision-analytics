@@ -176,9 +176,11 @@ def main():
 
     print(" 📐  Perspective transformed: Coordinates in meters calculated.")
 
-    # Filter out ball false positives: remove any detection where the ball would
-    # have to travel faster than BALL_MAX_SPEED_MPS (real-world meters) in one frame.
-    # This runs AFTER the view transformer so distances are in meters, not pixels.
+    # Ball post-transform pipeline:
+    #   detect → interpolate → transform → speed_filter → static_cluster_filter
+    # The speed filter removes physically impossible jumps; the static-cluster filter
+    # then removes long stretches where the "ball" doesn't move in real-world metres
+    # (pitch stains, socks, centre-spot artefacts the speed filter can't catch).
     tracks["ball"] = tracker.filter_ball_positions_by_speed(
         tracks["ball"],
         fps,
@@ -186,6 +188,13 @@ def main():
         pitch_length   = config.PITCH_LENGTH_M,
         pitch_width    = config.PITCH_WIDTH_M,
         pitch_margin   = config.PITCH_MARGIN_M,
+    )
+
+    tracks["ball"] = tracker.filter_static_ball_clusters(
+        tracks["ball"],
+        fps           = fps,
+        radius_m      = config.BALL_STATIC_RADIUS_M,
+        window_frames = config.BALL_STATIC_WINDOW_FRAMES,
     )
 
     # 6.8. Speed and distance estimation 

@@ -40,13 +40,30 @@ MAX_SPEED_GAP_FRAMES = int(os.getenv("MAX_SPEED_GAP_FRAMES", "30"))
 FIELD_WIDTH_METERS = float(os.getenv("FIELD_WIDTH_METERS", "68"))
 
 # Ball tracking
-BALL_MAX_SPEED_MPS  = float(os.getenv("BALL_MAX_SPEED_MPS",  "55.0"))  # ~200 km/h, world-record upper bound
+BALL_MAX_SPEED_MPS  = float(os.getenv("BALL_MAX_SPEED_MPS",  "40.0"))  # tuned for U-20 footage, well above realistic shots
+
+# YOLO inference thresholds for the ball pass (separate from the global YOLO_CONF/IOU)
+YOLO_BALL_CONF      = float(os.getenv("YOLO_BALL_CONF",      "0.35"))  # confidence floor for the YOLO ball pass
+YOLO_BALL_IOU       = float(os.getenv("YOLO_BALL_IOU",       "0.4"))   # NMS IoU for the YOLO ball pass
+
+# Crowd / stands mask: ignore detections whose top-Y is above this many pixels
+CROWD_MASK_Y_PX     = int  (os.getenv("CROWD_MASK_Y_PX",     "80"))
 
 # Ball detection gates (applied per-frame before any tracking)
-BALL_MIN_CONF       = float(os.getenv("BALL_MIN_CONF",       "0.50"))  # higher than player threshold (0.35)
+BALL_MIN_CONF       = float(os.getenv("BALL_MIN_CONF",       "0.35"))  # post-detection confidence gate
 BALL_MAX_BBOX_PX    = int  (os.getenv("BALL_MAX_BBOX_PX",    "90"))    # max width OR height in pixels (socks/stains are larger)
-BALL_MIN_ASPECT     = float(os.getenv("BALL_MIN_ASPECT",     "0.35"))  # min width/height ratio (socks are tall & thin)
-BALL_MAX_ASPECT     = float(os.getenv("BALL_MAX_ASPECT",     "2.80"))  # max width/height ratio (stains are wide & flat)
+BALL_MIN_BBOX_PX    = int  (os.getenv("BALL_MIN_BBOX_PX",    "4"))     # min width AND height in pixels (sub-pixel noise)
+BALL_MIN_ASPECT     = float(os.getenv("BALL_MIN_ASPECT",     "0.70"))  # min width/height ratio (ball is roughly square)
+BALL_MAX_ASPECT     = float(os.getenv("BALL_MAX_ASPECT",     "1.40"))  # max width/height ratio (ball is roughly square)
+
+# Ball interpolation
+BALL_INTERP_LIMIT     = int(os.getenv("BALL_INTERP_LIMIT",     "10"))     # max consecutive NaNs to fill
+BALL_INTERP_DIRECTION = os.getenv("BALL_INTERP_DIRECTION",     "both")    # 'forward' | 'backward' | 'both'
+
+# Static-ball cluster filter (post-transform): if the ball barely moves in real-world
+# meters across a window, those detections are almost certainly a stain / socks.
+BALL_STATIC_RADIUS_M       = float(os.getenv("BALL_STATIC_RADIUS_M",       "0.5"))
+BALL_STATIC_WINDOW_FRAMES  = int  (os.getenv("BALL_STATIC_WINDOW_FRAMES",  "30"))
 
 # Pitch field dimensions for out-of-bounds guard (FIFA standard, meters)
 PITCH_LENGTH_M      = float(os.getenv("PITCH_LENGTH_M",      "105.0"))
