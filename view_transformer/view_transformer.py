@@ -32,9 +32,34 @@ class ViewTransformer():
         # Reemplaza tus 4 puntos fijos por los 13 puntos oficiales de tu esqueleto.
         # Las llaves (0, 1, 2...) deben coincidir con el orden que les diste en Roboflow.
         self.target_vertices_dict = {
-            0: [0.0, 13.84], 1: [16.5, 13.84], 2: [0.0, 54.16], 3: [16.5, 54.16], 4: [11.0, 34.0],
-            5: [52.5, 24.85], 6: [52.5, 34.0], 7: [52.5, 43.15],
-            8: [88.5, 13.84], 9: [105.0, 13.84], 10: [88.5, 54.16], 11: [105.0, 54.16], 12: [94.0, 34.0]
+            # Fila superior
+            0:  [0.0,   0.0],   # L_corner_tl
+            1:  [0.0,  22.84],  # L_areas_tl
+            2:  [5.5,  22.84],  # L_areas_tr
+            3:  [0.0,  11.84],  # L_areab_tl
+            4:  [16.5, 11.84],  # L_areab_tr
+            5:  [50.0,  0.0],   # Center_top
+            6:  [83.5, 11.84],  # R_areab_tl
+            7:  [100.0,11.84],  # R_areab_tr
+            8:  [94.5, 22.84],  # R_areas_tl
+            9:  [100.0,22.84],  # R_areas_tr
+            10: [100.0, 0.0],   # R_corner_tr
+            # Fila media
+            11: [11.0, 32.0],   # L_penalspot
+            12: [50.0, 32.0],   # Center
+            13: [89.0, 32.0],   # R_penalspot
+            # Fila inferior
+            14: [0.0,  64.0],   # L_corner_bl
+            15: [0.0,  41.16],  # L_areas_bl
+            16: [5.5,  41.16],  # L_areas_br
+            17: [0.0,  52.16],  # L_areab_bl
+            18: [16.5, 52.16],  # L_areab_br
+            19: [50.0, 64.0],   # Center_bottom
+            20: [83.5, 52.16],  # R_areab_bl
+            21: [100.0,52.16],  # R_areab_br
+            22: [94.5, 41.16],  # R_areas_bl
+            23: [100.0,41.16],  # R_areas_br
+            24: [100.0,64.0],   # R_corner_br
         }
         
         # 3. Almacenamiento Dinámico
@@ -92,7 +117,7 @@ class ViewTransformer():
     
     # MODIFICACIÓN: Ahora la función necesita saber en qué frame estamos (frame_num)
     def transform_point(self, point, frame_num,
-                        _x_min=-5.0, _x_max=110.0, _y_min=-5.0, _y_max=73.0):
+                        _x_min=-5.0, _x_max=105.0, _y_min=-5.0, _y_max=69.0):
         """
         Transform a pixel coordinate to real-world meters using the per-frame homography.
 
@@ -112,7 +137,7 @@ class ViewTransformer():
         result = result.reshape(-1, 2)
 
         # Bounds guard: reject degenerate homography outputs.
-        # A valid pitch position is within [−5, 110] m × [−5, 73] m (FIFA 105×68 + margin).
+        # A valid pitch position is within [−5, 105] m × [−5, 69] m (100×64 + 5m margin).
         x, y = float(result[0, 0]), float(result[0, 1])
         if not (_x_min <= x <= _x_max and _y_min <= y <= _y_max):
             return None
