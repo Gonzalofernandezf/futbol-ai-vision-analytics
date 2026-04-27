@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 import pandas as pd
 
+import config as _cfg
+
 """
 Object Tracking and Visualization Module
 
@@ -45,12 +47,12 @@ class Tracker:
         batch_size = 20
         detections = []
         for i in range(0, len(frames), batch_size):
-            # 'iou=0.4' obliga a YOLO a borrar cajas que se solapen más de un 40%. 
+            # 'iou' obliga a YOLO a borrar cajas que se solapen más de ese ratio.
             # Esto elimina el "doble bbox" de raíz.
             detections_batch = self.model.predict(
-                frames[i:i+batch_size], 
-                conf=0.35, # Subimos el suelo de confianza
-                iou=0.4    # NMS más agresivo
+                frames[i:i+batch_size],
+                conf=_cfg.YOLO_BALL_CONF,
+                iou=_cfg.YOLO_BALL_IOU,
             )
             detections += detections_batch
         return detections
@@ -73,6 +75,15 @@ class Tracker:
             "ball": []      # Sets of Bboxes per frame for the ball
         }
 
+        # Ball pipeline counters (logged once at the end of detection)
+        ball_stats = {
+            "accepted":   0,
+            "rej_conf":   0,
+            "rej_size":   0,   # too large OR too small
+            "rej_aspect": 0,
+            "rej_bounds": 0,   # crowd-mask (handled later by filter_ball_positions_by_speed for pitch bounds)
+        }
+
         for frame_num, detection in enumerate(detections):
             cls_names = detection.names
             cls_names_inv = {v:k for k,v in cls_names.items()}
@@ -85,8 +96,12 @@ class Tracker:
             # detection_supervision = detection_supervision.with_nms(threshold=0.5)
             
             # 2. Ignoramos todo lo que pase en el tercio superior de la pantalla (gradas)
-            # Asumiendo que y=0 es arriba. Ajusta el 150 si corta cabezas de jugadores.
-            mask = detection_supervision.xyxy[:, 1] > 80 
+            # Asumiendo que y=0 es arriba. Ajusta CROWD_MASK_Y_PX en config si corta cabezas de jugadores.
+            mask = detection_supervision.xyxy[:, 1] > _cfg.CROWD_MASK_Y_PX
+            ball_class_id = cls_names_inv.get('ball')
+            if ball_class_id is not None:
+                rejected_balls = (~mask) & (detection_supervision.class_id == ball_class_id)
+                ball_stats["rej_bounds"] += int(rejected_balls.sum())
             detection_supervision = detection_supervision[mask]
 
             # This prevents the tracker from getting confused if the label changes
@@ -124,9 +139,8 @@ class Tracker:
             #      written to key 1, so the LAST one (lowest confidence, since YOLO sorts
             #      desc) overwrites the real ball.
             #   2. No geometry check → elongated sock boxes or large stain boxes pass.
-            #   3. No ball-specific confidence gate → conf=0.35 is too permissive.
+            #   3. No ball-specific confidence gate.
             # Fix: collect all candidates, apply shape/confidence gates, keep best conf.
-            import config as _cfg
             best_ball_conf = -1
             best_ball_entry = None
 
@@ -138,19 +152,24 @@ class Tracker:
                 if cls_id != cls_names_inv['ball']:
                     continue
 
-                # Gate 1: minimum confidence for ball (higher than player gate)
+                # Gate 1: minimum confidence for ball
                 if conf < _cfg.BALL_MIN_CONF:
+                    ball_stats["rej_conf"] += 1
                     continue
 
                 # Gate 2: size — ball cannot be large (socks, stains, heads are bigger)
+                # nor sub-pixel small (compression noise on grass)
                 w = bbox[2] - bbox[0]
                 h = bbox[3] - bbox[1]
-                if w > _cfg.BALL_MAX_BBOX_PX or h > _cfg.BALL_MAX_BBOX_PX:
+                if (w > _cfg.BALL_MAX_BBOX_PX or h > _cfg.BALL_MAX_BBOX_PX or
+                    w < _cfg.BALL_MIN_BBOX_PX or h < _cfg.BALL_MIN_BBOX_PX):
+                    ball_stats["rej_size"] += 1
                     continue
 
                 # Gate 3: shape — ball is roughly square; socks are tall, stains are flat
                 aspect = w / h if h > 0 else 999
                 if aspect < _cfg.BALL_MIN_ASPECT or aspect > _cfg.BALL_MAX_ASPECT:
+                    ball_stats["rej_aspect"] += 1
                     continue
 
                 # Keep the highest-confidence detection that passed all gates
@@ -164,6 +183,16 @@ class Tracker:
 
             if best_ball_entry is not None:
                 tracks["ball"][frame_num][1] = best_ball_entry
+                ball_stats["accepted"] += 1
+
+        print(
+            "⚽ Ball pipeline: "
+            f"aceptados {ball_stats['accepted']}, "
+            f"rechazados por conf {ball_stats['rej_conf']}, "
+            f"por size {ball_stats['rej_size']}, "
+            f"por aspect {ball_stats['rej_aspect']}, "
+            f"por bounds {ball_stats['rej_bounds']}"
+        )
 
         if stub_path is not None:
             with open(stub_path, 'wb') as f:
@@ -293,10 +322,13 @@ class Tracker:
 
         df_ball_positions = pd.DataFrame(ball_bboxes, columns=['x1', 'y1', 'x2', 'y2'])
 
-        # 2. Interpolation
-        # DESPUÉS (estricto — si no se ve, no se dibuja):
-        df_ball_positions = df_ball_positions.interpolate(method='linear', limit=3, limit_direction='forward')
-        # Eliminar el bfill() completamente para evitar que se dibujen bboxes en frames donde la pelota no es visible al principio del video.     
+        # 2. Interpolation — gap length and direction live in config so we can tune
+        # short-occlusion behaviour without touching code.
+        df_ball_positions = df_ball_positions.interpolate(
+            method='linear',
+            limit=_cfg.BALL_INTERP_LIMIT,
+            limit_direction=_cfg.BALL_INTERP_DIRECTION,
+        )
 
         # 3. Reconstruction 
         ball_positions_interpolated = []
@@ -391,10 +423,86 @@ class Tracker:
             last_valid_pos   = pos
             last_valid_frame = frame_num
 
-        total = removed_bounds + removed_speed
-        if total > 0:
-            print(f"⚽ Ball filter: removed {removed_bounds} out-of-bounds + "
-                  f"{removed_speed} speed-jump frames (limit {max_speed_mps} m/s)")
+        kept = sum(1 for f in ball_tracks if f and 1 in f)
+        print(
+            "⚽ Ball pipeline (post-transform): "
+            f"aceptados {kept}, "
+            f"rechazados por bounds {removed_bounds}, "
+            f"por speed {removed_speed} (limit {max_speed_mps} m/s)"
+        )
+
+        return ball_tracks
+
+    def filter_static_ball_clusters(self, ball_tracks, fps=None,
+                                    radius_m=None, window_frames=None):
+        """
+        Drop ball detections that barely move in real-world meters across a sliding
+        window — those are almost always pitch stains, white socks or the centre
+        circle, not the actual ball.
+
+        Operates on `position_transformed` (metres), so it must run AFTER
+        view_transformer.add_transformed_position_to_tracks().
+
+        Args:
+            ball_tracks (list[dict]): Per-frame ball track dicts (tracks["ball"]).
+            fps (float|None): Unused, accepted for API symmetry with the speed filter.
+            radius_m (float|None): Override BALL_STATIC_RADIUS_M.
+            window_frames (int|None): Override BALL_STATIC_WINDOW_FRAMES.
+
+        Returns:
+            list[dict]: ball_tracks with static clusters cleared in-place.
+        """
+        radius        = _cfg.BALL_STATIC_RADIUS_M       if radius_m       is None else radius_m
+        window        = _cfg.BALL_STATIC_WINDOW_FRAMES  if window_frames  is None else window_frames
+
+        n = len(ball_tracks)
+        if n == 0 or window <= 1:
+            print("⚽ Ball pipeline (static-cluster): aceptados 0, rechazados por static 0")
+            return ball_tracks
+
+        # Pre-extract transformed positions per frame, NaN where missing.
+        positions = np.full((n, 2), np.nan, dtype=float)
+        for i, frame_ball in enumerate(ball_tracks):
+            if frame_ball and 1 in frame_ball:
+                p = frame_ball[1].get('position_transformed')
+                if p is not None:
+                    arr = np.asarray(p, dtype=float).flatten()
+                    if arr.size >= 2:
+                        positions[i, 0] = arr[0]
+                        positions[i, 1] = arr[1]
+
+        to_drop = np.zeros(n, dtype=bool)
+
+        # Sliding window: if every detection inside [i, i+window) lies within `radius`
+        # of the window centroid, the whole window is static → drop those frames.
+        for start in range(0, n - window + 1):
+            end = start + window
+            block = positions[start:end]
+            valid = ~np.isnan(block[:, 0])
+            # Need the window to be (mostly) populated; require at least half full
+            # so a single sticky detection in an empty stretch doesn't trigger it.
+            if valid.sum() < max(2, window // 2):
+                continue
+
+            pts = block[valid]
+            centroid = pts.mean(axis=0)
+            dists = np.linalg.norm(pts - centroid, axis=1)
+            if dists.max() < radius:
+                idxs = np.where(valid)[0] + start
+                to_drop[idxs] = True
+
+        removed = 0
+        for i in range(n):
+            if to_drop[i] and ball_tracks[i] and 1 in ball_tracks[i]:
+                ball_tracks[i] = {}
+                removed += 1
+
+        kept = sum(1 for f in ball_tracks if f and 1 in f)
+        print(
+            "⚽ Ball pipeline (static-cluster): "
+            f"aceptados {kept}, rechazados por static {removed} "
+            f"(radius {radius} m, window {window} frames)"
+        )
 
         return ball_tracks
 
