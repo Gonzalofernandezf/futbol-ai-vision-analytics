@@ -66,8 +66,8 @@ BALL_STATIC_RADIUS_M       = float(os.getenv("BALL_STATIC_RADIUS_M",       "0.5"
 BALL_STATIC_WINDOW_FRAMES  = int  (os.getenv("BALL_STATIC_WINDOW_FRAMES",  "30"))
 
 # Pitch field dimensions for out-of-bounds guard (FIFA standard, meters)
-PITCH_LENGTH_M      = float(os.getenv("PITCH_LENGTH_M",      "105.0"))
-PITCH_WIDTH_M       = float(os.getenv("PITCH_WIDTH_M",       "68.0"))
+PITCH_LENGTH_M      = float(os.getenv("PITCH_LENGTH_M",      "100.0"))
+PITCH_WIDTH_M       = float(os.getenv("PITCH_WIDTH_M",       "64.0"))
 PITCH_MARGIN_M      = float(os.getenv("PITCH_MARGIN_M",      "5.0"))   # tolerance beyond edge before discarding
 
 # Visualization
