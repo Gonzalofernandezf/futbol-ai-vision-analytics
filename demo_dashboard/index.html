@@ -59,6 +59,10 @@
                 class="w-full flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-gray-700 text-left">
                 <i class="fas fa-chess-board w-6"></i> Análisis de Rivales
             </button>
+            <button onclick="showSection('metrics')" id="btn-metrics"
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-colors hover:bg-gray-700 text-left">
+                <i class="fas fa-microscope w-6"></i> Métricas ML
+            </button>
         </nav>
         <div class="p-4 border-t border-gray-700">
             <div class="flex items-center gap-3">
@@ -373,6 +377,111 @@
 
             </div>
         </div>
+
+        <!-- ══════════════════════════════════════════════════════════
+             SECCIÓN MÉTRICAS ML
+             Requiere: demo_dashboard/eval_report.json
+             Generado con: python eval/eval_keypoints.py --annotations ... --frames-dir ...
+        ══════════════════════════════════════════════════════════ -->
+        <div id="metrics-section" class="hidden fade-in">
+            <h2 class="text-3xl font-bold mb-2">Métricas ML</h2>
+            <p class="text-gray-400 mb-6">Calidad de detección de keypoints de cancha · <span id="metrics-timestamp" class="text-green-400 text-sm"></span></p>
+
+            <!-- Estado: sin datos -->
+            <div id="metrics-no-data" class="hidden bg-gray-800 rounded-xl p-10 text-center border border-dashed border-gray-600">
+                <i class="fas fa-flask text-4xl text-gray-500 mb-4"></i>
+                <p class="text-gray-400 text-lg mb-2">No hay reporte disponible aún</p>
+                <p class="text-gray-500 text-sm">Genera uno con:</p>
+                <code class="block mt-2 text-green-400 text-sm bg-gray-900 rounded p-3 text-left max-w-xl mx-auto">
+                    python eval/eval_keypoints.py \<br>
+                    &nbsp;&nbsp;--annotations ruta/keypoints_coco.json \<br>
+                    &nbsp;&nbsp;--frames-dir  ruta/frames/
+                </code>
+            </div>
+
+            <!-- Contenido del reporte (se muestra cuando hay datos) -->
+            <div id="metrics-content" class="hidden">
+
+                <!-- Tarjetas resumen -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-gray-800 p-5 rounded-xl border-l-4 border-green-500">
+                        <p class="text-gray-400 text-xs uppercase tracking-wide mb-1">PCK @ 10 px</p>
+                        <p id="kpi-pck10" class="text-3xl font-bold text-green-400">—</p>
+                        <p class="text-gray-500 text-xs mt-1">% keypoints correctos</p>
+                    </div>
+                    <div class="bg-gray-800 p-5 rounded-xl border-l-4 border-blue-500">
+                        <p class="text-gray-400 text-xs uppercase tracking-wide mb-1">Error medio</p>
+                        <p id="kpi-error-px" class="text-3xl font-bold text-blue-400">—</p>
+                        <p class="text-gray-500 text-xs mt-1">píxeles</p>
+                    </div>
+                    <div class="bg-gray-800 p-5 rounded-xl border-l-4 border-yellow-500">
+                        <p class="text-gray-400 text-xs uppercase tracking-wide mb-1">Error homografía</p>
+                        <p id="kpi-hom-error" class="text-3xl font-bold text-yellow-400">—</p>
+                        <p class="text-gray-500 text-xs mt-1">metros</p>
+                    </div>
+                    <div class="bg-gray-800 p-5 rounded-xl border-l-4 border-red-500">
+                        <p class="text-gray-400 text-xs uppercase tracking-wide mb-1">Fallo homografía</p>
+                        <p id="kpi-hom-fail" class="text-3xl font-bold text-red-400">—</p>
+                        <p class="text-gray-500 text-xs mt-1">% frames sin transform</p>
+                    </div>
+                </div>
+
+                <!-- Sub-tarjetas secundarias -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-gray-800 p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-xs mb-1">PCK @ 5 px</p>
+                        <p id="kpi-pck5" class="text-xl font-semibold text-gray-200">—</p>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-xs mb-1">PCK @ 20 px</p>
+                        <p id="kpi-pck20" class="text-xl font-semibold text-gray-200">—</p>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-xs mb-1">Kp detectados / frame</p>
+                        <p id="kpi-kps-frame" class="text-xl font-semibold text-gray-200">—</p>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-xl text-center">
+                        <p class="text-gray-400 text-xs mb-1">Frames evaluados</p>
+                        <p id="kpi-n-frames" class="text-xl font-semibold text-gray-200">—</p>
+                    </div>
+                </div>
+
+                <!-- Gráfico: PCK@10px por keypoint (peores primero) -->
+                <div class="bg-gray-800 rounded-xl p-6 mb-8">
+                    <h3 class="text-lg font-semibold mb-1">PCK @ 10 px por keypoint</h3>
+                    <p class="text-gray-500 text-xs mb-4">Ordenado de peor a mejor — los puntos a la izquierda necesitan más atención</p>
+                    <div class="relative" style="height: 320px;">
+                        <canvas id="kp-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Tabla detalle por keypoint -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">Detalle por keypoint</h3>
+                        <span class="text-gray-500 text-xs">25 keypoints · ordenar por columna haciendo click</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm" id="kp-table">
+                            <thead>
+                                <tr class="text-gray-400 text-xs uppercase border-b border-gray-700">
+                                    <th class="text-left py-2 pr-4 cursor-pointer hover:text-white" onclick="sortTable('name')">Keypoint</th>
+                                    <th class="text-right py-2 px-3 cursor-pointer hover:text-white" onclick="sortTable('recall')">Recall</th>
+                                    <th class="text-right py-2 px-3 cursor-pointer hover:text-white" onclick="sortTable('pck_5px')">PCK@5px</th>
+                                    <th class="text-right py-2 px-3 cursor-pointer hover:text-white" onclick="sortTable('pck_10px')">PCK@10px</th>
+                                    <th class="text-right py-2 px-3 cursor-pointer hover:text-white" onclick="sortTable('pck_20px')">PCK@20px</th>
+                                    <th class="text-right py-2 px-3 cursor-pointer hover:text-white" onclick="sortTable('mean_error_px')">Error (px)</th>
+                                    <th class="text-right py-2 px-3 cursor-pointer hover:text-white" onclick="sortTable('n_gt_visible')">GT visible</th>
+                                </tr>
+                            </thead>
+                            <tbody id="kp-table-body" class="divide-y divide-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div><!-- /metrics-content -->
+        </div><!-- /metrics-section -->
 
     </main>
 
@@ -1162,6 +1271,158 @@
                 console.error("Error crítico:", error);
             }
         });
+
+        // ── MÉTRICAS ML ──────────────────────────────────────────────────────
+        // Lee eval_report.json generado por eval/eval_keypoints.py y renderiza
+        // el dashboard de calidad del modelo de keypoints.
+
+        let _kpChart = null;       // instancia Chart.js, guardada para destruir al recargar
+        let _kpData  = null;       // cache de los datos del reporte
+        let _sortKey = 'pck_10px'; // columna activa de ordenación
+        let _sortAsc = true;
+
+        // Carga automática cuando el usuario navega a la sección
+        const _origShowSection = showSection;
+        showSection = function(sectionId) {
+            _origShowSection(sectionId);
+            if (sectionId === 'metrics' && !_kpData) loadMetrics();
+        };
+
+        async function loadMetrics() {
+            try {
+                const res = await fetch('eval_report.json');
+                if (!res.ok) throw new Error('eval_report.json no encontrado');
+                _kpData = await res.json();
+                renderMetrics(_kpData);
+            } catch (e) {
+                // Sin datos: mostrar instrucciones
+                document.getElementById('metrics-no-data').classList.remove('hidden');
+                document.getElementById('metrics-content').classList.add('hidden');
+            }
+        }
+
+        function renderMetrics(data) {
+            document.getElementById('metrics-no-data').classList.add('hidden');
+            document.getElementById('metrics-content').classList.remove('hidden');
+
+            const s = data.summary;
+            const m = data.metadata;
+
+            // Timestamp del reporte
+            document.getElementById('metrics-timestamp').textContent =
+                `Reporte: ${m.timestamp}  ·  modelo: ${m.model}  ·  conf ≥ ${m.conf_threshold}`;
+
+            // KPIs principales
+            const pct = v => v != null ? (v * 100).toFixed(1) + '%' : '—';
+            document.getElementById('kpi-pck10').textContent     = pct(s.overall_pck_10px);
+            document.getElementById('kpi-pck5').textContent      = pct(s.overall_pck_5px);
+            document.getElementById('kpi-pck20').textContent     = pct(s.overall_pck_20px);
+            document.getElementById('kpi-error-px').textContent  = s.mean_error_px != null ? s.mean_error_px + ' px' : '—';
+            document.getElementById('kpi-hom-error').textContent = s.mean_homography_error_m != null ? s.mean_homography_error_m + ' m' : '—';
+            document.getElementById('kpi-hom-fail').textContent  = pct(s.homography_failure_rate);
+            document.getElementById('kpi-kps-frame').textContent =
+                `${s.mean_kps_detected_per_frame} / ${s.mean_kps_gt_per_frame}`;
+            document.getElementById('kpi-n-frames').textContent  = m.n_frames;
+
+            // Colorear KPI de fallo homografía (rojo si > 20%, amarillo si > 10%)
+            const failEl = document.getElementById('kpi-hom-fail');
+            if (s.homography_failure_rate > 0.2) failEl.classList.replace('text-red-400', 'text-red-500');
+            else if (s.homography_failure_rate < 0.1) failEl.classList.replace('text-red-400', 'text-green-400');
+
+            renderChart(data.per_keypoint);
+            renderTable(data.per_keypoint);
+        }
+
+        function renderChart(perKp) {
+            // Ordena keypoints por PCK@10px ascendente (peores primero → más urgentes a la izquierda)
+            const sorted = Object.entries(perKp)
+                .filter(([, v]) => v.pck_10px != null)
+                .sort(([, a], [, b]) => a.pck_10px - b.pck_10px);
+
+            const labels = sorted.map(([name]) => name.replace(/_/g, ' '));
+            const pck10  = sorted.map(([, v]) => +(v.pck_10px * 100).toFixed(1));
+            // Color: verde si ≥80%, amarillo si ≥60%, rojo si <60%
+            const colors = pck10.map(v => v >= 80 ? '#22c55e' : v >= 60 ? '#eab308' : '#ef4444');
+
+            const ctx = document.getElementById('kp-chart').getContext('2d');
+            if (_kpChart) _kpChart.destroy();
+
+            _kpChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'PCK@10px (%)',
+                        data: pck10,
+                        backgroundColor: colors,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.parsed.y}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 45 },
+                            grid: { color: '#374151' }
+                        },
+                        y: {
+                            min: 0, max: 100,
+                            ticks: { color: '#9ca3af', callback: v => v + '%' },
+                            grid: { color: '#374151' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTable(perKp) {
+            const rows = Object.entries(perKp).map(([name, v]) => ({ name, ...v }));
+            rows.sort((a, b) => {
+                const va = a[_sortKey] ?? -1;
+                const vb = b[_sortKey] ?? -1;
+                return _sortAsc ? va - vb : vb - va;
+            });
+
+            const pct  = v => v != null ? (v * 100).toFixed(1) + '%' : '—';
+            const num  = v => v != null ? v : '—';
+            // Color de celda PCK
+            const cls  = v => {
+                if (v == null) return 'text-gray-500';
+                const p = v * 100;
+                return p >= 80 ? 'text-green-400 font-semibold'
+                    : p >= 60  ? 'text-yellow-400'
+                    :            'text-red-400';
+            };
+
+            const tbody = document.getElementById('kp-table-body');
+            tbody.innerHTML = rows.map(r => `
+                <tr class="hover:bg-gray-700 transition-colors">
+                    <td class="py-2 pr-4 font-mono text-xs text-gray-300">${r.name}</td>
+                    <td class="text-right px-3 ${cls(r.recall)}">${pct(r.recall)}</td>
+                    <td class="text-right px-3 ${cls(r.pck_5px)}">${pct(r.pck_5px)}</td>
+                    <td class="text-right px-3 ${cls(r.pck_10px)}">${pct(r.pck_10px)}</td>
+                    <td class="text-right px-3 ${cls(r.pck_20px)}">${pct(r.pck_20px)}</td>
+                    <td class="text-right px-3 text-gray-300">${num(r.mean_error_px)}</td>
+                    <td class="text-right px-3 text-gray-500">${r.n_gt_visible}</td>
+                </tr>
+            `).join('');
+        }
+
+        function sortTable(key) {
+            if (_sortKey === key) _sortAsc = !_sortAsc;
+            else { _sortKey = key; _sortAsc = true; }
+            if (_kpData) renderTable(_kpData.per_keypoint);
+        }
+        // ── FIN MÉTRICAS ML ───────────────────────────────────────────────────
     </script>
 
 </body>
