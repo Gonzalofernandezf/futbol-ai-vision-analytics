@@ -37,11 +37,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 KEYPOINT_NAMES = [
     "L_corner_tl",   # 0   esquina sup-izq
     "L_areas_tl",    # 1   área chica sup-izq
-    "L_areas_tr",    # 2   área chica sup-der (izq del campo)
-    "L_areab_tl",    # 3   área grande sup-izq
-    "L_areab_tr",    # 4   área grande sup-der (izq del campo)
-    "Center_top",    # 5   línea de medio campo, borde sup
-    "R_areab_tl",    # 6   área grande sup-izq (der del campo)
+    "L_areas_tr",    # 2   área chica sup-der (izq del campo)git pull origin claude/analyze-ball-detection-xawdK
+
+python eval\eval_keypoints.py --annotations eval\ground_truth\_annotations.coco.json --frames-dir eval\frames
     "R_areab_tr",    # 7   área grande sup-der
     "R_areas_tl",    # 8   área chica sup-izq (der del campo)
     "R_areas_tr",    # 9   área chica sup-der
@@ -93,61 +91,49 @@ def load_coco_gt(coco_path: str):
 
     id_to_filename = {img["id"]: img["file_name"] for img in coco["images"]}
 
-    # Detecta el número de keypoints desde el schema del JSON
-    n_kps = 25
+    # Usa nombres del schema si están definidos y son 25
     kp_names = KEYPOINT_NAMES
     if coco.get("categories"):
         schema_names = coco["categories"][0].get("keypoints", [])
-        if schema_names:
-            n_kps = len(schema_names)
-            kp_names = schema_names if n_kps == 25 else schema_names
-            if n_kps != 25:
-                print(f"[INFO] JSON tiene {n_kps} keypoints (esperados 25). "
-                      f"Se usarán los primeros {min(n_kps, 25)} para métricas.")
+        if len(schema_names) == 25:
+            kp_names = schema_names
 
     gt_dict = {}
     for ann in coco["annotations"]:
         fname = id_to_filename[ann["image_id"]]
-        raw = ann["keypoints"]
-        actual_n = len(raw) // 3
+        raw = ann["keypoints"]  # 75 valores: [x0,y0,v0, x1,y1,v1, ...]
         kps = []
-        for i in range(actual_n):
+        for i in range(25):
             x, y, v = raw[3 * i], raw[3 * i + 1], int(raw[3 * i + 2])
-            name = kp_names[i] if i < len(kp_names) else f"kp_{i}"
-            kps.append({"x": float(x), "y": float(y), "v": v, "name": name})
+            kps.append({"x": float(x), "y": float(y), "v": v, "name": kp_names[i]})
         gt_dict[fname] = kps
 
-    # Ajusta n_kps al valor real observado en las anotaciones
-    if gt_dict:
-        n_kps = len(next(iter(gt_dict.values())))
-
-    return gt_dict, kp_names[:n_kps] if len(kp_names) >= n_kps else kp_names
+    return gt_dict, kp_names
 
 
 # ── Inferencia del modelo ──────────────────────────────────────────────────────
 
-def run_model(model, frame: np.ndarray, conf_threshold: float, n_kps: int = 25) -> list[dict]:
+def run_model(model, frame: np.ndarray, conf_threshold: float) -> list[dict]:
     """
-    Corre modelo_cancha.pt sobre un frame y devuelve n_kps predicciones ordenadas.
-    Si no hay detección, devuelve n_kps entradas con detected=False.
+    Corre modelo_cancha.pt sobre un frame y devuelve 25 predicciones ordenadas.
+    Si no hay detección, devuelve 25 entradas con detected=False.
     """
     not_detected = [{"x": 0.0, "y": 0.0, "conf": 0.0, "detected": False}
-                    for _ in range(n_kps)]
+                    for _ in range(25)]
 
     results = model(frame, verbose=False)[0]
 
     if results.keypoints is None or len(results.keypoints.xy) == 0:
         return not_detected
 
-    xy   = results.keypoints.xy[0].cpu().numpy()
-    conf = results.keypoints.conf[0].cpu().numpy()
+    xy   = results.keypoints.xy[0].cpu().numpy()    # (25, 2)
+    conf = results.keypoints.conf[0].cpu().numpy()  # (25,)
 
-    actual = xy.shape[0]
-    if actual == 0:
+    if xy.shape[0] != 25:
         return not_detected
 
     preds = []
-    for i in range(min(actual, n_kps)):
+    for i in range(25):
         c = float(conf[i])
         preds.append({
             "x": float(xy[i][0]),
@@ -170,7 +156,7 @@ def compute_homography_error(gt_kps: list, pred_kps: list) -> float | None:
     # Puntos GT para construir la homografía de referencia
     gt_px, gt_world = [], []
     for i, kp in enumerate(gt_kps):
-        if kp["v"] >= 1 and i in TARGET_VERTICES:
+        if kp["v"] >= 1:  # solo keypoints anotados
             gt_px.append([kp["x"], kp["y"]])
             gt_world.append(TARGET_VERTICES[i])
 
@@ -215,8 +201,6 @@ def evaluate(coco_path: str, frames_dir: str, conf_threshold: float,
     print(f"PCK thresholds:    {pck_thresholds} px\n")
 
     gt_dict, kp_names = load_coco_gt(coco_path)
-    n_kps = len(kp_names)
-    print(f"Keypoints detectados en GT: {n_kps}\n")
 
     # Acumuladores por keypoint
     kp_stats = {
@@ -246,7 +230,7 @@ def evaluate(coco_path: str, frames_dir: str, conf_threshold: float,
             print(f"  [WARN] Error al leer: {img_path}")
             continue
 
-        pred_kps = run_model(model, frame, conf_threshold, n_kps)
+        pred_kps = run_model(model, frame, conf_threshold)
 
         n_gt_visible = sum(1 for kp in gt_kps if kp["v"] >= 1)
         n_detected   = sum(1 for p  in pred_kps if p["detected"])
