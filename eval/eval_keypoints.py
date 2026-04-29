@@ -9,12 +9,12 @@ Métricas calculadas:
   - Error de reproyección de homografía en metros
 
 Uso:
-    python eval/eval_keypoints.py \
-        --annotations ruta/keypoints_coco.json \
-        --frames-dir  ruta/frames/ \
-        [--output demo_dashboard/eval_report.json] \
-        [--conf 0.35] \
-        [--pck-thresholds 5 10 20]
+    python eval/eval_keypoints.py
+        --annotations ruta/keypoints_coco.json
+        --frames-dir  ruta/frames/
+        --output demo_dashboard/eval_report.json
+        --conf 0.35
+        --pck-thresholds 5 10 20
 
 El JSON de salida es leído por la sección "Métricas ML" del dashboard.
 """
