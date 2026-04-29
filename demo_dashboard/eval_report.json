@@ -1,0 +1,1069 @@
+{
+  "metadata": {
+    "timestamp": "2026-04-29T19:16:06",
+    "n_frames": 90,
+    "model": "modelo_cancha.pt",
+    "conf_threshold": 0.35,
+    "pck_thresholds_px": [
+      5,
+      10,
+      20
+    ],
+    "git_commit": {
+      "hash": "fe29e002e3ed61b378360487eb1940a1feff938c",
+      "short_hash": "fe29e00",
+      "message": "Final fix o eval",
+      "date": "2026-04-29 16:17:17 +0200"
+    }
+  },
+  "summary": {
+    "overall_pck_5px": 0.0,
+    "overall_pck_10px": 0.0,
+    "overall_pck_20px": 0.0,
+    "mean_error_px": null,
+    "median_error_px": null,
+    "homography_failure_rate": 1.0,
+    "mean_homography_error_m": null,
+    "mean_kps_detected_per_frame": 0.0,
+    "mean_kps_gt_per_frame": 7.3
+  },
+  "per_keypoint": {
+    "L_corner_tl": {
+      "n_gt_visible": 28,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areas_tl": {
+      "n_gt_visible": 26,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areas_tr": {
+      "n_gt_visible": 29,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areab_tl": {
+      "n_gt_visible": 29,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areab_tr": {
+      "n_gt_visible": 29,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "Center_top": {
+      "n_gt_visible": 32,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areab_tl": {
+      "n_gt_visible": 40,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areab_tr": {
+      "n_gt_visible": 41,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areas_tl": {
+      "n_gt_visible": 43,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areas_tr": {
+      "n_gt_visible": 41,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_corner_tr": {
+      "n_gt_visible": 43,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_penalspot": {
+      "n_gt_visible": 27,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "Center": {
+      "n_gt_visible": 32,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_penalspot": {
+      "n_gt_visible": 40,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_corner_bl": {
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areas_bl": {
+      "n_gt_visible": 18,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areas_br": {
+      "n_gt_visible": 17,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areab_bl": {
+      "n_gt_visible": 15,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "L_areab_br": {
+      "n_gt_visible": 13,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "Center_bottom": {
+      "n_gt_visible": 1,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areab_bl": {
+      "n_gt_visible": 24,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areab_br": {
+      "n_gt_visible": 20,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areas_bl": {
+      "n_gt_visible": 28,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_areas_br": {
+      "n_gt_visible": 26,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    },
+    "R_corner_br": {
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "recall": 0.0,
+      "mean_error_px": null,
+      "pck_5px": 0.0,
+      "pck_10px": 0.0,
+      "pck_20px": 0.0
+    }
+  },
+  "per_frame": [
+    {
+      "filename": "frame_076398_t42m29s_jpg.rf.1qXfT3INcIjIQPqqWuKS.jpg",
+      "n_gt_visible": 3,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_011459_t06m22s_jpg.rf.07yUNUwcT51i1FPjx5CS.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_010582_t05m53s_jpg.rf.1sn3locziCSsxbmpTMRK.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_154441_t85m53s_jpg.rf.0X9UdkuDumrJ3cSm1D1k.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_113196_t62m56s_jpg.rf.4qzY2c39yiFDUBZbhJmR.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_132502_t73m41s_jpg.rf.1WVsTa6Kn8sF5fa6CZma.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_062358_t34m40s_jpg.rf.6UX1q3DoIVF2BDeBY4OU.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_035153_t19m32s_jpg.rf.3Ls8MtvJGM5IQKLAf5VL.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_122849_t68m19s_jpg.rf.4KfVyHZVsk0Kw2rrR1rQ.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_144788_t80m31s_jpg.rf.2bKGb82rcMnTjsS7VOar.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_166727_t92m43s_jpg.rf.2DeBG6cxvpNPnLkmNLtc.jpg",
+      "n_gt_visible": 4,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_023745_t13m12s_jpg.rf.5twl2aAxpCC28O8USqRx.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_150931_t83m56s_jpg.rf.5gyIZXzz38NDpDP6IxLw.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_118461_t65m52s_jpg.rf.1GwSzzD2Y6y1tbmtmNLI.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_142155_t79m03s_jpg.rf.5XmlLnJgF584OMV3OAbg.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_157951_t87m50s_jpg.rf.79BJWaf8d1QIIoBEYHqN.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_145666_t81m00s_jpg.rf.5kU5WmkSuIK3MyuoSaSG.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_080786_t44m55s_jpg.rf.6U7OGILjLUGJFfrEGOxd.jpg",
+      "n_gt_visible": 5,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_007071_t03m55s_jpg.rf.8n9VUKN1kk2HfJ3b4Hy0.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "zona_confort_medio_14_png.rf.1oOuyJ6x78Vlaq6d5UJX.png",
+      "n_gt_visible": 5,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_012337_t06m51s_jpg.rf.CKtkLYgEihsIIE1VChRS.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_130747_t72m42s_jpg.rf.CPj17OP5EV8U62HK7w1q.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_139523_t77m35s_jpg.rf.7gLA5WAWMCaZPuY63Olx.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_027255_t15m09s_jpg.rf.7iX6PC0LV1tAvHWLXhGa.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_013214_t07m20s_jpg.rf.5knCP49IRjLXspnkHqBI.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_017602_t09m47s_jpg.rf.8AaEWlzOmpAorL3snvXk.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_036908_t20m31s_jpg.rf.8ryi7yyIw38vNK9OTGVB.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_148298_t82m28s_jpg.rf.ABTIFHQVtpVJ2Ks2iZld.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_048317_t26m52s_jpg.rf.9w6O7MvwdTzyvolfza91.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_021112_t11m44s_jpg.rf.9W3Qjli8PwrYQnaWjba5.jpg",
+      "n_gt_visible": 12,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_128115_t71m14s_jpg.rf.ITAmzS2Hn0wpUGcvaw0U.jpg",
+      "n_gt_visible": 4,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "zoom_in_izq_11_png.rf.19fibrAylOL89K9viZq9.png",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_061480_t34m11s_jpg.rf.COM8Mm5F7xON0kAR8Vco.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_008827_t04m54s_jpg.rf.FVO5fvLzg8bflzHHiSfF.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_119339_t66m21s_jpg.rf.GIPOki7y0AVRwluKWyQm.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_050072_t27m50s_jpg.rf.EhjB92vWVGvyEAe5fnla.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_173748_t96m37s_jpg.rf.8zUTWo58PVd2d5dOHauF.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_160584_t89m18s_jpg.rf.G1mJusVanJRtysmmCDSD.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_031643_t17m35s_jpg.rf.HL5RVP8UbNeHeN4MiN39.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_014969_t08m19s_jpg.rf.HPfYh4A4q6vZuv0jhgj6.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_079909_t44m26s_jpg.rf.HSfBFDcaAYpR5e819o4G.jpg",
+      "n_gt_visible": 3,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_164972_t91m44s_jpg.rf.CC8PXOGHZQ8j1B8fFw7s.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_002684_t01m29s_jpg.rf.KtggtKBlhLGyn2jQQWRu.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_155319_t86m22s_jpg.rf.KvJP8dRXoi8BRqAFW9wb.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "zoom_in_der_14_png.rf.0kz0VACQkZ2kxygyL5ik.png",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_141278_t78m33s_jpg.rf.La37wEvZlobGFJ1cPm02.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_003561_t01m58s_jpg.rf.Lx4xYZHd9NbJi5WPLuRW.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_021990_t12m13s_jpg.rf.MAa6bTdSRBXq9lVtBCNT.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_037786_t21m00s_jpg.rf.Hus0WmzE8go1uarvxnAE.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_053582_t29m47s_jpg.rf.JGxpUuOv35CB4Va3dlwa.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_025500_t14m10s_jpg.rf.JHovzlmjLJLuuwTdJkuy.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_137768_t76m36s_jpg.rf.KIrPnPCmishDmXf9hCRl.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_152686_t84m54s_jpg.rf.K8Oq05mCVkAeI0ZEOlVt.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_014092_t07m50s_jpg.rf.ItHXSWcHepAgtLpi3sQq.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_128992_t71m44s_jpg.rf.KJdZoWxuYSyWxtHuwTRh.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_129870_t72m13s_jpg.rf.KqdAKsvlIpLTEcvUuv9g.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_069378_t38m34s_jpg.rf.NSlfP9uBCsfcgabsBeQq.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_071133_t39m33s_jpg.rf.NWgf80Amg4lSDlloztAH.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_047439_t26m22s_jpg.rf.NjWAq9GZgb74LGyJrHvB.jpg",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_054460_t30m17s_jpg.rf.NvAziXmZkbWvGSaKRFPY.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_131625_t73m11s_jpg.rf.ONT1KzEzZoPSCRg0GUD6.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "movimiento_medioD_3_png.rf.EO8zOvgcTniE0fa2t5kS.png",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "zona_confort_medioD_19_png.rf.CX7yRZhhMev6L4oOga3A.png",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_032521_t18m05s_jpg.rf.Q2F4tFssFI6QwyphqrfR.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_050949_t28m19s_jpg.rf.MQKixnIjLcZ3yeFSK05W.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_117584_t65m23s_jpg.rf.MnlVjo1MhKcZFWKOSgdY.jpg",
+      "n_gt_visible": 3,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_159707_t88m48s_jpg.rf.MPwEqVSeW3ZQmAQ1mOzM.jpg",
+      "n_gt_visible": 3,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_066745_t37m07s_jpg.rf.N3APH56dOxDdkb17Tc5X.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_156196_t86m51s_jpg.rf.NMQfSo2TaFmP0k2AwZdc.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_058847_t32m43s_jpg.rf.N7G4eIus1kN0aaVocvti.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_038663_t21m30s_jpg.rf.S4gPYQ1GbXNbBvzNzksg.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_134257_t74m39s_jpg.rf.SZ3U0wmae82iUCFXq5Q3.jpg",
+      "n_gt_visible": 7,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "movimiento_medioI_6_png.rf.HgetjiapsgkLQmH7zoe1.png",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "movimiento_izq_7_png.rf.KRqsCNqu3sT3DxJ1Ln5h.png",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_072888_t40m32s_jpg.rf.Q4LPTBE4Lj0UkzXZIffe.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_167605_t93m12s_jpg.rf.QSMlO3QqmpJH0hhTcBHi.jpg",
+      "n_gt_visible": 3,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_163217_t90m46s_jpg.rf.RKGg5jKZpnyJcIrojVc1.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_072011_t40m02s_jpg.rf.R5eBotqWs0YQhpFj4RxS.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_079031_t43m57s_jpg.rf.RUizyn9HpkRfT8Ew7x1h.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "movimiento_izq_10_png.rf.Lzu4Zsc9p58UZztBYuhv.png",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_036031_t20m02s_jpg.rf.S7ZT7e8LLwOPvG79mGi0.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_068500_t38m05s_jpg.rf.TSNvXMpyou2ozS9NvebI.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_057970_t32m14s_jpg.rf.V51FmoqzgKrxIBBAu5O4.jpg",
+      "n_gt_visible": 9,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_064990_t36m08s_jpg.rf.UVId14Zyc59tELLYkK4W.jpg",
+      "n_gt_visible": 6,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_151809_t84m25s_jpg.rf.RAsn9BYBNtPEyUsfvyns.jpg",
+      "n_gt_visible": 11,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_024623_t13m41s_jpg.rf.U7vQ6B7K36FPgatVZjMB.jpg",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_018480_t10m16s_jpg.rf.VADyWN2qFCNcdLo642Kf.jpg",
+      "n_gt_visible": 3,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "zona_confort_izq_12_png.rf.PZ0lpDQ2w0IzpxnwQlfH.png",
+      "n_gt_visible": 10,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "movimiento_medio_2_png.rf.PeY5OpObyu6nBkIfQ5NU.png",
+      "n_gt_visible": 8,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    },
+    {
+      "filename": "frame_063235_t35m09s_jpg.rf.T3SxcsjyuwsV99N5ReQM.jpg",
+      "n_gt_visible": 2,
+      "n_detected": 0,
+      "n_matched": 0,
+      "mean_error_px": null,
+      "homography_ok": false,
+      "homography_error_m": null
+    }
+  ]
+}

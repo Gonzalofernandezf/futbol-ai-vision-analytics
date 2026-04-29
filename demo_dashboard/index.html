@@ -384,8 +384,21 @@
              Generado con: python eval/eval_keypoints.py --annotations ... --frames-dir ...
         ══════════════════════════════════════════════════════════ -->
         <div id="metrics-section" class="hidden fade-in">
-            <h2 class="text-3xl font-bold mb-2">Métricas ML</h2>
-            <p class="text-gray-400 mb-6">Calidad de detección de keypoints de cancha · <span id="metrics-timestamp" class="text-green-400 text-sm"></span></p>
+            <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="text-3xl font-bold mb-1">Métricas ML</h2>
+                    <p class="text-gray-400">Calidad de detección de keypoints de cancha · <span id="metrics-timestamp" class="text-green-400 text-sm"></span></p>
+                </div>
+                <!-- Selector de reporte archivado (se muestra cuando hay manifest) -->
+                <div id="archive-selector" class="hidden flex items-center gap-2 mt-1">
+                    <label for="archive-select" class="text-gray-400 text-xs whitespace-nowrap">Cargar reporte:</label>
+                    <select id="archive-select"
+                            class="bg-gray-700 text-sm text-white rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            onchange="loadArchivedReport(this.value)">
+                        <option value="">— reporte actual —</option>
+                    </select>
+                </div>
+            </div>
 
             <!-- Estado: sin datos -->
             <div id="metrics-no-data" class="hidden bg-gray-800 rounded-xl p-10 text-center border border-dashed border-gray-600">
@@ -401,6 +414,18 @@
 
             <!-- Contenido del reporte (se muestra cuando hay datos) -->
             <div id="metrics-content" class="hidden">
+
+                <!-- Evolución histórica de KPIs -->
+                <div id="history-panel" class="hidden bg-gray-800 rounded-xl p-6 mb-8">
+                    <div class="flex items-center justify-between mb-1">
+                        <h3 class="text-lg font-semibold">Evolución de KPIs por versión</h3>
+                        <span id="history-count" class="text-gray-500 text-xs"></span>
+                    </div>
+                    <p class="text-gray-500 text-xs mb-4">Cada punto es una ejecución de eval · etiqueta = commit</p>
+                    <div class="relative" style="height: 280px;">
+                        <canvas id="history-chart"></canvas>
+                    </div>
+                </div>
 
                 <!-- Tarjetas resumen -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -1422,6 +1447,160 @@
             else { _sortKey = key; _sortAsc = true; }
             if (_kpData) renderTable(_kpData.per_keypoint);
         }
+        // ── HISTORIAL DE EVALS ────────────────────────────────────────────────
+        let _histChart = null;
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('eval_history.json');
+                if (!res.ok) return;
+                const history = await res.json();
+                if (!Array.isArray(history) || history.length < 1) return;
+                renderHistory(history);
+            } catch (_) { /* sin historial: panel oculto */ }
+        }
+
+        async function loadManifest() {
+            try {
+                const res = await fetch('reports/manifest.json');
+                if (!res.ok) return;
+                const manifest = await res.json();
+                if (!Array.isArray(manifest) || manifest.length === 0) return;
+
+                const sel = document.getElementById('archive-select');
+                // Mostrar más recientes primero
+                manifest.slice().reverse().forEach(entry => {
+                    const opt = document.createElement('option');
+                    opt.value = entry.filename;
+                    const date = (entry.timestamp || '').slice(0, 10);
+                    const hash = entry.git_hash || '?';
+                    const msg  = (entry.git_message || '—').slice(0, 32);
+                    const pck  = entry.overall_pck_10px != null
+                        ? ' · PCK@10=' + (entry.overall_pck_10px * 100).toFixed(1) + '%'
+                        : '';
+                    opt.textContent = `${hash} · ${date} · ${msg}${pck}`;
+                    sel.appendChild(opt);
+                });
+                document.getElementById('archive-selector').classList.remove('hidden');
+            } catch (_) { /* sin manifest */ }
+        }
+
+        async function loadArchivedReport(filename) {
+            if (!filename) {
+                // Restaurar reporte actual
+                if (_kpData) renderMetrics(_kpData);
+                return;
+            }
+            try {
+                const res = await fetch(`reports/${filename}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                renderMetrics(data);
+            } catch (e) {
+                console.error('Error cargando reporte archivado:', e);
+            }
+        }
+
+        function renderHistory(history) {
+            document.getElementById('history-panel').classList.remove('hidden');
+            document.getElementById('history-count').textContent =
+                `${history.length} ejecuciones`;
+
+            // Etiqueta: "abc1234: mensaje" (truncado a 20 chars)
+            const labels = history.map(e => {
+                const h = e.git_hash || '?';
+                const msg = (e.git_message || '').slice(0, 20);
+                return `${h}: ${msg}`;
+            });
+
+            const pck10 = history.map(e =>
+                e.overall_pck_10px != null ? +(e.overall_pck_10px * 100).toFixed(1) : null);
+            const homFail = history.map(e =>
+                e.homography_failure_rate != null ? +(e.homography_failure_rate * 100).toFixed(1) : null);
+            const errPx = history.map(e => e.mean_error_px);
+
+            const ctx = document.getElementById('history-chart').getContext('2d');
+            if (_histChart) _histChart.destroy();
+
+            _histChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'PCK@10px (%)',
+                            data: pck10,
+                            borderColor: '#22c55e',
+                            backgroundColor: '#22c55e33',
+                            tension: 0.3,
+                            yAxisID: 'yPct',
+                            pointRadius: 5,
+                            spanGaps: true,
+                        },
+                        {
+                            label: 'Fallo homografía (%)',
+                            data: homFail,
+                            borderColor: '#ef4444',
+                            backgroundColor: '#ef444433',
+                            tension: 0.3,
+                            yAxisID: 'yPct',
+                            pointRadius: 5,
+                            spanGaps: true,
+                        },
+                        {
+                            label: 'Error medio (px)',
+                            data: errPx,
+                            borderColor: '#60a5fa',
+                            backgroundColor: '#60a5fa33',
+                            tension: 0.3,
+                            yAxisID: 'yPx',
+                            pointRadius: 5,
+                            spanGaps: true,
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#9ca3af', font: { size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: items => labels[items[0].dataIndex],
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 30 },
+                            grid: { color: '#374151' }
+                        },
+                        yPct: {
+                            type: 'linear', position: 'left',
+                            min: 0, max: 100,
+                            ticks: { color: '#9ca3af', callback: v => v + '%' },
+                            grid: { color: '#374151' },
+                        },
+                        yPx: {
+                            type: 'linear', position: 'right',
+                            ticks: { color: '#60a5fa', callback: v => v + 'px' },
+                            grid: { drawOnChartArea: false },
+                        }
+                    }
+                }
+            });
+        }
+
+        // Cargar historial y manifest junto con las métricas actuales
+        const _origLoadMetrics = loadMetrics;
+        loadMetrics = async function() {
+            await _origLoadMetrics();
+            await loadHistory();
+            await loadManifest();
+        };
         // ── FIN MÉTRICAS ML ───────────────────────────────────────────────────
     </script>
 

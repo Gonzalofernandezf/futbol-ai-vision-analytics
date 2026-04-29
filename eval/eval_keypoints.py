@@ -22,6 +22,7 @@ El JSON de salida es leído por la sección "Métricas ML" del dashboard.
 import argparse
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -37,9 +38,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 KEYPOINT_NAMES = [
     "L_corner_tl",   # 0   esquina sup-izq
     "L_areas_tl",    # 1   área chica sup-izq
-    "L_areas_tr",    # 2   área chica sup-der (izq del campo)git pull origin claude/analyze-ball-detection-xawdK
-
-python eval\eval_keypoints.py --annotations eval\ground_truth\_annotations.coco.json --frames-dir eval\frames
+    "L_areas_tr",    # 2   área chica sup-der (izq del campo)
+    "L_areab_tl",    # 3   área grande sup-izq
+    "L_areab_tr",    # 4   área grande sup-der (izq del campo)
+    "Center_top",    # 5   línea de medio campo, borde sup
+    "R_areab_tl",    # 6   área grande sup-izq (der del campo)
     "R_areab_tr",    # 7   área grande sup-der
     "R_areas_tl",    # 8   área chica sup-izq (der del campo)
     "R_areas_tr",    # 9   área chica sup-der
@@ -85,6 +88,9 @@ def load_coco_gt(coco_path: str):
     Formato COCO de keypoints:
       annotation.keypoints = [x0,y0,v0, x1,y1,v1, ..., x24,y24,v24]
       v=0: no anotado  |  v=1: anotado no visible  |  v=2: anotado y visible
+
+    Roboflow puede exportar arrays cortos si algunos keypoints nunca se anotaron.
+    En ese caso se rellena con ceros (v=0) hasta completar 25 entradas.
     """
     with open(coco_path) as f:
         coco = json.load(f)
@@ -101,7 +107,8 @@ def load_coco_gt(coco_path: str):
     gt_dict = {}
     for ann in coco["annotations"]:
         fname = id_to_filename[ann["image_id"]]
-        raw = ann["keypoints"]  # 75 valores: [x0,y0,v0, x1,y1,v1, ...]
+        # Rellena hasta 75 valores (25 kp × 3) si Roboflow exportó menos
+        raw = ann["keypoints"] + [0.0] * max(0, 75 - len(ann["keypoints"]))
         kps = []
         for i in range(25):
             x, y, v = raw[3 * i], raw[3 * i + 1], int(raw[3 * i + 2])
@@ -182,6 +189,108 @@ def compute_homography_error(gt_kps: list, pred_kps: list) -> float | None:
         errors.append(float(np.linalg.norm(p_world - canon)))
 
     return float(np.mean(errors)) if errors else None
+
+
+# ── Git / archive / history helpers ───────────────────────────────────────────
+
+def _get_git_info() -> dict:
+    """Devuelve hash, mensaje y fecha del commit HEAD. Silencioso si no hay repo."""
+    try:
+        raw = subprocess.check_output(
+            ["git", "log", "-1", "--format=%H|%h|%s|%ci"],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        full_hash, short_hash, message, date = raw.split("|", 3)
+        return {"hash": full_hash, "short_hash": short_hash,
+                "message": message, "date": date}
+    except Exception:
+        return {"hash": None, "short_hash": None, "message": None, "date": None}
+
+
+def _save_archive(report: dict, output_path: str) -> None:
+    """
+    Guarda copia completa en demo_dashboard/reports/<short_hash>_<ts>.json
+    y actualiza demo_dashboard/reports/manifest.json para que el dashboard
+    pueda enumerar los reportes disponibles.
+    """
+    git = report["metadata"].get("git_commit") or {}
+    s   = report["summary"]
+    m   = report["metadata"]
+    short_hash = git.get("short_hash") or "nogit"
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    reports_dir = Path(output_path).parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+
+    filename = f"{short_hash}_{ts}.json"
+    dest = reports_dir / filename
+    with open(dest, "w") as f:
+        json.dump(report, f, indent=2)
+    print(f"    Archivo archivado       → {dest}")
+
+    # Actualizar manifest (array ordenado, el más reciente al final)
+    manifest_path = reports_dir / "manifest.json"
+    manifest = []
+    if manifest_path.exists():
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except Exception:
+            manifest = []
+
+    manifest.append({
+        "filename":               filename,
+        "git_hash":               git.get("short_hash"),
+        "git_message":            git.get("message"),
+        "git_date":               git.get("date"),
+        "timestamp":              m["timestamp"],
+        "model":                  m["model"],
+        "overall_pck_10px":       s.get("overall_pck_10px"),
+        "homography_failure_rate": s.get("homography_failure_rate"),
+    })
+
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+    print(f"    Manifest actualizado    → {manifest_path}  ({len(manifest)} entradas)")
+
+
+def _append_history(report: dict, main_output_path: str) -> None:
+    """Añade una entrada compacta a demo_dashboard/eval_history.json."""
+    s   = report["summary"]
+    m   = report["metadata"]
+    git = m.get("git_commit") or {}
+
+    entry = {
+        "timestamp":              m["timestamp"],
+        "git_hash":               git.get("short_hash"),
+        "git_message":            git.get("message"),
+        "git_date":               git.get("date"),
+        "model":                  m["model"],
+        "conf_threshold":         m["conf_threshold"],
+        "n_frames":               m["n_frames"],
+        "overall_pck_5px":        s.get("overall_pck_5px"),
+        "overall_pck_10px":       s.get("overall_pck_10px"),
+        "overall_pck_20px":       s.get("overall_pck_20px"),
+        "mean_error_px":          s.get("mean_error_px"),
+        "mean_homography_error_m": s.get("mean_homography_error_m"),
+        "homography_failure_rate": s.get("homography_failure_rate"),
+        "mean_kps_detected_per_frame": s.get("mean_kps_detected_per_frame"),
+    }
+
+    history_path = Path(main_output_path).parent / "eval_history.json"
+    history = []
+    if history_path.exists():
+        try:
+            with open(history_path) as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+
+    history.append(entry)
+
+    with open(history_path, "w") as f:
+        json.dump(history, f, indent=2)
+    print(f"    Historial actualizado   → {history_path}  ({len(history)} entradas)")
 
 
 # ── Evaluación principal ───────────────────────────────────────────────────────
@@ -329,9 +438,19 @@ def evaluate(coco_path: str, frames_dir: str, conf_threshold: float,
         "per_frame":    frame_results,
     }
 
+    # ── Git info ──────────────────────────────────────────────────────────────
+    git_commit = _get_git_info()
+    report["metadata"]["git_commit"] = git_commit
+
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(report, f, indent=2)
+
+    # ── Archive: full report per run ──────────────────────────────────────────
+    _save_archive(report, output_path)
+
+    # ── History: append compact summary ──────────────────────────────────────
+    _append_history(report, output_path)
 
     s = report["summary"]
     pck_primary = pck_thresholds[1] if len(pck_thresholds) > 1 else pck_thresholds[0]
