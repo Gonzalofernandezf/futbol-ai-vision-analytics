@@ -48,6 +48,9 @@ best_100e.pt
 # Demo dashboard config
 demo_dashboard/match_data.json
 
+# Eval archives (full per-run reports, served locally, not committed)
+demo_dashboard/reports/
+
 # Jupyter
 .ipynb_checkpoints/
 

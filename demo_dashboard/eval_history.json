@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp": "2026-04-29T19:16:06",
+    "git_hash": "fe29e00",
+    "git_message": "Final fix o eval",
+    "git_date": "2026-04-29 16:17:17 +0200",
+    "model": "modelo_cancha.pt",
+    "conf_threshold": 0.35,
+    "n_frames": 90,
+    "overall_pck_5px": 0.0,
+    "overall_pck_10px": 0.0,
+    "overall_pck_20px": 0.0,
+    "mean_error_px": null,
+    "mean_homography_error_m": null,
+    "homography_failure_rate": 1.0,
+    "mean_kps_detected_per_frame": 0.0
+  }
+]
