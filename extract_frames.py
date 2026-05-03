@@ -24,6 +24,7 @@ def extract_frames(
     end_sec: float = 0.0,
     skip_start_sec: float = 0.0,
     skip_end_sec: float = 0.0,
+    offset_frac: float = 0.0,
 ) -> None:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -50,7 +51,9 @@ def extract_frames(
         valid_indices = all_indices
 
     n_frames = min(n_frames, len(valid_indices))
-    sample_positions = np.linspace(0, len(valid_indices) - 1, n_frames, dtype=int)
+    step = len(valid_indices) / n_frames
+    sample_positions = (np.arange(n_frames) * step + step * offset_frac).astype(int)
+    sample_positions = np.clip(sample_positions, 0, len(valid_indices) - 1)
     indices = valid_indices[sample_positions]
 
     os.makedirs(output_dir, exist_ok=True)
@@ -100,6 +103,11 @@ if __name__ == "__main__":
                         help="Segundo de inicio del descanso a omitir")
     parser.add_argument("--skip-end", type=float, default=0.0, metavar="SEG",
                         help="Segundo de fin del descanso a omitir")
+    parser.add_argument("--offset-frac", type=float, default=0.0, metavar="FRAC",
+                        help="Desplazamiento dentro de cada bucket (0.0-1.0). "
+                             "Útil para extraer frames distintos a una extracción previa "
+                             "(ej. --offset-frac 0.5 para no solapar con la primera).")
     args = parser.parse_args()
 
-    extract_frames(args.video, args.n, args.output, args.start, args.end, args.skip_start, args.skip_end)
+    extract_frames(args.video, args.n, args.output, args.start, args.end,
+                   args.skip_start, args.skip_end, args.offset_frac)
