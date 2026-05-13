@@ -45,6 +45,10 @@ output_videos/
 best_100e.pt
 .env
 
+# Datasets / frame extractions (no commitear)
+frames_ball_tagging/
+frames_subset/
+
 # Demo dashboard config
 demo_dashboard/match_data.json
 
