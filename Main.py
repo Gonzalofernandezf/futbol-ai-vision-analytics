@@ -165,8 +165,8 @@ def main():
     camera_movement_estimator.add_adjust_positions_to_tracks(tracks, camera_movement_per_frame)
     
     # 6.3 Transformación de Perspectiva Dinámica con IA
-    # Instanciamos la clase y le pasamos el nombre de tu modelo de Roboflow
-    view_transformer = ViewTransformer(model_path='modelo_cancha.pt') 
+    # Auto-detecta el tipo de modelo (pose vs detect) y usa el mapping correcto
+    view_transformer = ViewTransformer(model_path=config.MODELO_CANCHA_PATH)
     
     # NUEVO PASO: Le pedimos a la IA que mire todo el video y calcule todas las matrices primero
     view_transformer.calcular_matrices_para_video(video_frames)
