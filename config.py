@@ -13,6 +13,7 @@ PROJECT_ROOT = Path(__file__).parent
 # File paths
 VIDEO_PATH = os.getenv("VIDEO_PATH", "video_OG.mp4")
 MODEL_PATH = os.getenv("MODEL_PATH", "best_100e.pt")
+MODELO_CANCHA_PATH = os.getenv("MODELO_CANCHA_PATH", "modelo_cancha.pt")
 STUB_PATH = os.getenv("STUB_PATH", os.path.join(PROJECT_ROOT, "stubs", "track_stubs.pkl"))
 
 # Output directories
@@ -38,6 +39,9 @@ MAX_SPEED_GAP_FRAMES = int(os.getenv("MAX_SPEED_GAP_FRAMES", "30"))
 
 # Calibration parameters
 FIELD_WIDTH_METERS = float(os.getenv("FIELD_WIDTH_METERS", "68"))
+
+# Field keypoint detection (modelo_cancha.pt) — supports both pose & detect modes
+FIELD_KP_CONF = float(os.getenv("FIELD_KP_CONF", "0.35"))  # confidence floor for field keypoints
 
 # Ball tracking
 BALL_MAX_SPEED_MPS  = float(os.getenv("BALL_MAX_SPEED_MPS",  "40.0"))  # tuned for U-20 footage, well above realistic shots
