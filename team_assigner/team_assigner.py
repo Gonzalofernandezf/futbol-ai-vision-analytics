@@ -37,18 +37,24 @@ class TeamAssigner:
 
     def get_player_color(self, frame, bbox):
         image = frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
-        
+
+        if image.size == 0:
+            return np.array([128, 128, 128], dtype=float)
+
         # 1. Take the top half
         top_half = image[0:int(image.shape[0]/2), :]
-        
+
         # 2. Crop the sides to keep the center (chest)
         # This prevents the background grass from contaminating the color
         height, width, _ = top_half.shape
         start_x = int(width * 0.20) # Ignore left 20% of the image
         end_x = int(width * 0.80)   # Ignore right 20% of the image
-        
+
         player_crop = top_half[:, start_x:end_x]
-        
+
+        if player_crop.size == 0:
+            return np.array([128, 128, 128], dtype=float)
+
         # Get the model using the cropped image
         kmeans = self.get_clustering_model(player_crop)
 

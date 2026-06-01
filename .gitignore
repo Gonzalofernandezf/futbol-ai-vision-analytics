@@ -57,3 +57,6 @@ demo_dashboard/reports/
 # OS
 Thumbs.db
 .DS_Store
+
+frames_ball_tagging/
+frames_subset/
