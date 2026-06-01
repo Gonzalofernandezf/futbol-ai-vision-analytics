@@ -71,6 +71,7 @@ class ViewTransformer():
         """
         print("⚽ Calculando matrices de perspectiva con IA para todo el video...")
         frames_con_matriz = 0
+        class_hit_count = {cls_id: 0 for cls_id in self.target_vertices_dict}
 
         for frame_num, frame in enumerate(video_frames):
             resultados_cancha = self.modelo_cancha(frame, verbose=False)[0]
@@ -98,6 +99,7 @@ class ViewTransformer():
                 for cls_id, (_, cx, cy) in best_per_class.items():
                     pts_pixeles.append([cx, cy])
                     pts_metros.append(self.target_vertices_dict[cls_id])
+                    class_hit_count[cls_id] += 1
 
             if len(pts_pixeles) >= 4:
                 matriz, _ = cv2.findHomography(
@@ -120,6 +122,12 @@ class ViewTransformer():
 
         total = len(video_frames)
         print(f"   Matrices calculadas: {frames_con_matriz}/{total} frames ({frames_con_matriz/total*100:.0f}%)")
+        print("   Detecciones por clase (cuántos frames detectó cada punto):")
+        class_names = self.modelo_cancha.names
+        for cls_id, count in sorted(class_hit_count.items(), key=lambda x: x[1]):
+            pct = count / total * 100
+            bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
+            print(f"   {cls_id:2d} {class_names[cls_id]:20s} {bar} {pct:5.1f}%  ({count} frames)")
     
     # MODIFICACIÓN: Ahora la función necesita saber en qué frame estamos (frame_num)
     def transform_point(self, point, frame_num,
