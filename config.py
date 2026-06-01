@@ -33,7 +33,8 @@ YOLO_TRACKER = os.getenv("YOLO_TRACKER", "bytetrack.yaml")
 
 # Processing parameters
 FRAME_WINDOW = int(os.getenv("FRAME_WINDOW", "5"))
-MAX_SPEED_KMH = float(os.getenv("MAX_SPEED_KMH", "45"))
+MAX_SPEED_KMH = float(os.getenv("MAX_SPEED_KMH", "32"))   # techo biomecánico para fútbol base/semipro
+SPEED_MEDIAN_WINDOW = int(os.getenv("SPEED_MEDIAN_WINDOW", "3"))  # ventanas a medianizar (1 ventana = FRAME_WINDOW frames)
 MIN_TRACK_DURATION = float(os.getenv("MIN_TRACK_DURATION", "0.5"))
 MAX_SPEED_GAP_FRAMES = int(os.getenv("MAX_SPEED_GAP_FRAMES", "30"))
 

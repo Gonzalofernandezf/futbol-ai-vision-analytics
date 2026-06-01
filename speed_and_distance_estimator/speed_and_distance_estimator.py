@@ -1,6 +1,9 @@
 import cv2
-import sys 
+import sys
+import numpy as np
 sys.path.append("../")
+
+from config import MAX_SPEED_KMH, SPEED_MEDIAN_WINDOW
 
 """
 Speed and Distance Calculation Module
@@ -61,19 +64,10 @@ class SpeedAndDistance_Estimator():
                     speed_meters_per_second = distance / time_elapsed
                     speed_km_per_hour = speed_meters_per_second * 3.6
 
-                    # --- ANTI-FLASH FILTER (BIOMECHANICAL LIMIT) ---
-                    # The maximum human speed ever recorded is ~37.6 km/h (Usain Bolt).
-                    # Any speed above 40.0 km/h is physically impossible and indicates:
-                    # A) A video cut/halftime jump (Teleportation).
-                    # B) A perspective matrix transformation jitter.
-                    # C) An ID switch error from the tracker.
-                    MAX_POSSIBLE_SPEED_KMH = 40.0 
-                    
-                    if speed_km_per_hour > MAX_POSSIBLE_SPEED_KMH:
-                        # We ignore this invalid window. This prevents massive fake distances
-                        # from being added during halftime cuts and cleans up the UI graphs.
+                    # Techo biomecánico: descarta ventanas imposibles antes de acumular distancia.
+                    # Causas típicas: jitter de homografía, ID switch, corte de vídeo.
+                    if speed_km_per_hour > MAX_SPEED_KMH:
                         continue
-                    # -----------------------------------------------
 
                     # 3. Save data in the Tracker
                     if object not in total_distance:
@@ -89,6 +83,12 @@ class SpeedAndDistance_Estimator():
                             continue
                         tracks[object][frame_num_batch][track_id]['speed'] = speed_km_per_hour
                         tracks[object][frame_num_batch][track_id]['distance'] = total_distance[object][track_id]
+
+        # MEDIAN FILTER POR JUGADOR
+        # Suaviza picos de velocidad causados por jitter de homografía o ID switches
+        # que sobrevivieron al techo biomecánico (ej: 31 km/h cuando el jugador va a 12).
+        # Opera sobre las velocidades ya asignadas por ventana antes del forward-fill.
+        self._apply_speed_median_filter(tracks)
 
         # SMART FORWARD FILL (With tolerance limit)
         # Why 45: position_transformed returns None whenever the homography is
@@ -144,6 +144,46 @@ class SpeedAndDistance_Estimator():
                         # CASE 3: A long time passed without data. Do not fill (let it die).
                         else:
                             frames_since_last_valid += 1
+
+    def _apply_speed_median_filter(self, tracks):
+        """
+        Aplica un filtro de mediana deslizante sobre la serie de velocidad de cada jugador.
+        Elimina picos aislados (1-2 ventanas) que pasaron el techo biomecánico pero
+        siguen siendo inconsistentes con el movimiento real (ej. 30 km/h rodeado de 12 km/h).
+        La ventana opera en unidades de frame_window para no romper los saltos naturales
+        entre mediciones no contiguas.
+        """
+        half = SPEED_MEDIAN_WINDOW // 2
+
+        for object, object_tracks in tracks.items():
+            if object in ("ball", "referees"):
+                continue
+
+            unique_ids = set()
+            for frame_data in object_tracks:
+                unique_ids.update(frame_data.keys())
+
+            for track_id in unique_ids:
+                # Recoger frames donde hay velocidad calculada (no forward-fill aún)
+                frames_with_speed = [
+                    fn for fn in range(len(object_tracks))
+                    if track_id in object_tracks[fn]
+                    and "speed" in object_tracks[fn][track_id]
+                ]
+                if len(frames_with_speed) < 3:
+                    continue
+
+                speeds = [object_tracks[fn][track_id]["speed"] for fn in frames_with_speed]
+
+                # Mediana deslizante sobre la lista de velocidades
+                smoothed = []
+                for i, fn in enumerate(frames_with_speed):
+                    lo = max(0, i - half)
+                    hi = min(len(speeds), i + half + 1)
+                    smoothed.append(float(np.median(speeds[lo:hi])))
+
+                for i, fn in enumerate(frames_with_speed):
+                    object_tracks[fn][track_id]["speed"] = smoothed[i]
 
     def draw_speed_and_distance(self, frames, tracks):
         output_frames = []
