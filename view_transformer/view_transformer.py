@@ -29,37 +29,32 @@ class ViewTransformer():
         print(f"🏟️  Modelo cancha: task={self.modelo_cancha.task}  clases={self.modelo_cancha.names}")
 
         # Mapeo class_id → coordenadas reales (metros).
-        # ⚠️  El order de las claves DEBE coincidir con el order de clases del data.yaml
-        # que usaste en Roboflow. Verifica con el print anterior que class 0 = L_corner_tl, etc.
+        # Orden según data.yaml exportado de Roboflow (alfabético por nombre de clase).
+        # Sistema de coordenadas: x=0 línea de gol izquierda, x=100 línea de gol derecha,
+        # y=0 banda superior, y=64 banda inferior.
         self.target_vertices_dict = {
-            # Fila superior
-            0:  [0.0,   0.0],   # L_corner_tl
-            1:  [0.0,  22.84],  # L_areas_tl
-            2:  [5.5,  22.84],  # L_areas_tr
-            3:  [0.0,  11.84],  # L_areab_tl
-            4:  [16.5, 11.84],  # L_areab_tr
-            5:  [50.0,  0.0],   # Center_top
-            6:  [83.5, 11.84],  # R_areab_tl
-            7:  [100.0,11.84],  # R_areab_tr
-            8:  [94.5, 22.84],  # R_areas_tl
-            9:  [100.0,22.84],  # R_areas_tr
-            10: [100.0, 0.0],   # R_corner_tr
-            # Fila media
-            11: [11.0, 32.0],   # L_penalspot
-            12: [50.0, 32.0],   # Center
-            13: [89.0, 32.0],   # R_penalspot
-            # Fila inferior
-            14: [0.0,  64.0],   # L_corner_bl
-            15: [0.0,  41.16],  # L_areas_bl
-            16: [5.5,  41.16],  # L_areas_br
-            17: [0.0,  52.16],  # L_areab_bl
-            18: [16.5, 52.16],  # L_areab_br
-            19: [50.0, 64.0],   # Center_bottom
-            20: [83.5, 52.16],  # R_areab_bl
-            21: [100.0,52.16],  # R_areab_br
-            22: [94.5, 41.16],  # R_areas_bl
-            23: [100.0,41.16],  # R_areas_br
-            24: [100.0,64.0],   # R_corner_br
+            0:  [16.5,  52.16],  # big_l_far_bot
+            1:  [16.5,  11.84],  # big_l_far_top
+            2:  [0.0,   52.16],  # big_l_goal_bot
+            3:  [0.0,   11.84],  # big_l_goal_top
+            4:  [83.5,  52.16],  # big_r_far_bot
+            5:  [83.5,  11.84],  # big_r_far_top
+            6:  [100.0, 52.16],  # big_r_goal_bot
+            7:  [100.0, 11.84],  # big_r_goal_top
+            8:  [50.0,  32.0],   # center_spot
+            9:  [50.0,  41.15],  # circle_bot
+            10: [50.0,  22.85],  # circle_top
+            11: [0.0,   64.0],   # corner_bl
+            12: [100.0, 64.0],   # corner_br
+            13: [0.0,   0.0],    # corner_tl
+            14: [100.0, 0.0],    # corner_tr
+            15: [50.0,  0.0],    # halfline_top
+            16: [11.0,  32.0],   # penalty_l
+            17: [89.0,  32.0],   # penalty_r
+            18: [5.5,   41.16],  # small_l_far_bot
+            19: [5.5,   22.84],  # small_l_far_top
+            20: [94.5,  41.16],  # small_r_far_bot
+            21: [94.5,  22.84],  # small_r_far_top
         }
         
         # 3. Almacenamiento Dinámico
