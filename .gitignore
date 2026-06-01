@@ -42,7 +42,8 @@ env/
 stubs/
 output_videos/
 *.mp4
-best_100e.pt
+# Model weights – never commit, copy manually from training outputs
+*.pt
 .env
 
 # Demo dashboard config
