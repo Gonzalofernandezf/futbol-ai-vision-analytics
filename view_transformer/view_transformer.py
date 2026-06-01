@@ -88,7 +88,7 @@ class ViewTransformer():
 
                 best_per_class = {}  # {class_id: (conf, center_x, center_y)}
                 for box, cls_id, conf in zip(xyxy, cls_ids, confs):
-                    if conf < 0.5 or cls_id not in self.target_vertices_dict:
+                    if conf < 0.25 or cls_id not in self.target_vertices_dict:
                         continue
                     if cls_id not in best_per_class or conf > best_per_class[cls_id][0]:
                         cx = (box[0] + box[2]) / 2.0
@@ -116,7 +116,7 @@ class ViewTransformer():
 
             # Diagnóstico solo en el primer frame para no saturar el log
             if frame_num == 0:
-                print(f"   Frame 0: {len(pts_pixeles)} keypoints detectados con conf>0.5")
+                print(f"   Frame 0: {len(pts_pixeles)} puntos de cancha detectados con conf>0.25")
 
         total = len(video_frames)
         print(f"   Matrices calculadas: {frames_con_matriz}/{total} frames ({frames_con_matriz/total*100:.0f}%)")
