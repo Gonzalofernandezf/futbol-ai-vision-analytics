@@ -86,7 +86,7 @@ def main():
 
     # 2. Leer Video (Con recorte exacto de Primer y Segundo Tiempo)
     segmentos_partido = [
-        (time_to_sec("0:00:31"), time_to_sec("0:01:06"))
+        (time_to_sec("0:00:31"), time_to_sec("0:46:31"))
     ]
     
     # Llamamos a la nueva función pasándole los segmentos
