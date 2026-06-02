@@ -336,25 +336,30 @@ def main():
     exporter.export_json(tracks, json_output_path, home_possession=home_poss, away_possession=away_poss, view_transformer=view_transformer)
     print(f" 💾  Historical data saved to: {json_output_path}")
 
-    # 10. Draw + save video (skip on memory-constrained envs with SKIP_VIDEO_OUTPUT=true)
+    # 10. Draw + save video — streaming frame-by-frame to avoid doubling RAM
+    # (skip entirely with SKIP_VIDEO_OUTPUT=true for JSON-only runs)
     if config.SKIP_VIDEO_OUTPUT:
         print("⏭️  SKIP_VIDEO_OUTPUT=true — skipping annotated video render.")
     else:
-        print("🎨 Drawing ellipses and triangles...")
-        output_video_frames = tracker.draw_annotations(video_frames, tracks)
-
-        output_video_frames = camera_movement_estimator.draw_camera_movement(output_video_frames, camera_movement_per_frame)
+        print("🎨 Rendering annotated video (streaming)...")
+        h, w = video_frames[0].shape[:2]
+        fourcc = cv2.VideoWriter_fourcc(*'vp09')
+        writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
         team_ball_control_arr = np.array(team_ball_control)
-        print("📊 Stamping possession statistics...")
-        for frame_num, frame in enumerate(output_video_frames):
-            output_video_frames[frame_num] = tracker.draw_team_ball_control(frame, frame_num, team_ball_control_arr)
+        total_frames = len(video_frames)
+        for frame_num, orig_frame in enumerate(video_frames):
+            frame = orig_frame.copy()
+            frame = tracker.draw_annotations_frame(frame, frame_num, tracks)
+            frame = camera_movement_estimator.draw_camera_movement_frame(frame, frame_num, camera_movement_per_frame)
+            frame = tracker.draw_team_ball_control(frame, frame_num, team_ball_control_arr)
+            frame = speed_and_distance_estimator.draw_speed_and_distance_frame(frame, frame_num, tracks)
+            writer.write(frame)
+            if frame_num % 500 == 0:
+                print(f"  ✍️  {frame_num}/{total_frames} frames rendered...")
 
-        output_video_frames = speed_and_distance_estimator.draw_speed_and_distance(output_video_frames, tracks)
-
-        print(f"💾 Saving final video to {output_path}...")
-        save_video(output_video_frames, output_path, fps)
-        print("✅ Done! Check the new video.")
+        writer.release()
+        print(f"✅ Video saved to {output_path}")
 
     # 11. Auto-deploy to demo folder
     print(" 🚀  Updating web demo...")

@@ -124,3 +124,15 @@ class CameraMovementEstimator():
             output_frames.append(frame)
 
         return output_frames
+
+    def draw_camera_movement_frame(self, frame, frame_num, camera_movement_per_frame):
+        """Dibuja el overlay de movimiento de cámara sobre un único frame (para render en streaming)."""
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, 0), (500, 100), (255, 255, 255), -1)
+        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+
+        x_movement, y_movement = camera_movement_per_frame[frame_num]
+        cv2.putText(frame, f"Camera Movement X: {x_movement:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+        cv2.putText(frame, f"Camera Movement Y: {y_movement:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+
+        return frame

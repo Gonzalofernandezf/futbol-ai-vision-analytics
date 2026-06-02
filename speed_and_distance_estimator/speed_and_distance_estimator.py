@@ -217,6 +217,24 @@ class SpeedAndDistance_Estimator():
         
         return output_frames
 
+    def draw_speed_and_distance_frame(self, frame, frame_num, tracks):
+        """Dibuja velocidad y distancia sobre un único frame (para render en streaming)."""
+        for object, object_tracks in tracks.items():
+            if object in ("ball", "referees"):
+                continue
+            for track_id, track_info in object_tracks[frame_num].items():
+                speed = track_info.get('speed', None)
+                distance = track_info.get('distance', None)
+                if speed is None or distance is None:
+                    continue
+                bbox = track_info['bbox']
+                position = (int(bbox[2]) + 10, int(bbox[3]))
+                cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        return frame
+
     def measure_distance(self, p1, p2):
         # Pythagoras: a^2 + b^2 = c^2
         return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**0.5

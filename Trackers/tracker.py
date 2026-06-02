@@ -301,6 +301,26 @@ class Tracker:
 
         return output_video_frames
 
+    def draw_annotations_frame(self, frame, frame_num, tracks):
+        """Dibuja anotaciones sobre un único frame (para render en streaming)."""
+        player_dict = tracks["players"][frame_num]
+        ball_dict = tracks["ball"][frame_num]
+        referee_dict = tracks["referees"][frame_num]
+
+        for track_id, player in player_dict.items():
+            color = player.get("team_color", (0, 0, 255))
+            frame = self.draw_ellipse(frame, player["bbox"], color, track_id)
+            if player.get('has_ball', False):
+                frame = self.draw_triangle(frame, player["bbox"], (0, 0, 255))
+
+        for track_id, referee in referee_dict.items():
+            frame = self.draw_ellipse(frame, referee["bbox"], (0, 255, 255), track_id)
+
+        for track_id, ball in ball_dict.items():
+            frame = self.draw_triangle(frame, ball["bbox"], (0, 255, 0))
+
+        return frame
+
 # -------------------------------------
     # Utilities for export and calculations
     def get_center_of_bbox(self, bbox):
