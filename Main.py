@@ -78,16 +78,12 @@ def main():
     output_path = get_dynamic_output_path(output_dir)
     
     print(f"📁 Video will be saved as: {output_path}")
-    # Tiempos a analizar dinámicos
-    # Función "helper" interna para convertir reloj a segundos
-    def time_to_sec(time_str):
-        h, m, s = map(int, time_str.split(':'))
-        return h * 3600 + m * 60 + s
 
-    # 2. Leer Video (Con recorte exacto de Primer y Segundo Tiempo)
-    segmentos_partido = [
-        (time_to_sec("0:00:31"), time_to_sec("0:46:31"))
-    ]
+    # 2. Leer Video — rango controlado por VIDEO_START_SEC / VIDEO_END_SEC (config / .env)
+    if config.VIDEO_END_SEC is not None:
+        segmentos_partido = [(config.VIDEO_START_SEC, config.VIDEO_END_SEC)]
+    else:
+        segmentos_partido = None  # lee el vídeo completo
     
     # Llamamos a la nueva función pasándole los segmentos
     video_frames, fps = read_video(video_path, segments=segmentos_partido)
