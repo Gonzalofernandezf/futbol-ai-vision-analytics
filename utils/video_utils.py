@@ -1,33 +1,46 @@
 import cv2
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import FRAME_SCALE
+
+def _scale(frame):
+    if FRAME_SCALE == 1.0:
+        return frame
+    h, w = frame.shape[:2]
+    return cv2.resize(frame, (int(w * FRAME_SCALE), int(h * FRAME_SCALE)),
+                      interpolation=cv2.INTER_AREA)
 
 def read_video(video_path, segments=None):
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     frames = []
-    
+
+    scale_info = f" (escala {FRAME_SCALE})" if FRAME_SCALE != 1.0 else ""
+
     if not segments:
-        print("🎬 Leyendo el video completo...")
+        print(f"🎬 Leyendo el video completo{scale_info}...")
         while True:
             ret, frame = cap.read()
             if not ret: break
-            frames.append(frame)
+            frames.append(_scale(frame))
     else:
         for i, (start_sec, end_sec) in enumerate(segments):
             start_frame = int(start_sec * fps)
             end_frame = int(end_sec * fps)
-            
+
             cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
             current_frame = start_frame
-            
-            print(f"🎬 Extrayendo Tiempo {i+1}: Desde el segundo {start_sec} hasta el {end_sec}...")
-            
+
+            print(f"🎬 Extrayendo Tiempo {i+1}: Desde el segundo {start_sec} hasta el {end_sec}{scale_info}...")
+
             while current_frame < end_frame:
                 ret, frame = cap.read()
-                if not ret: 
-                    break 
-                frames.append(frame)
+                if not ret:
+                    break
+                frames.append(_scale(frame))
                 current_frame += 1
-                
+
     cap.release()
     print(f"✅ Extracción completada. Total de fotogramas a analizar: {len(frames)}")
     return frames, fps

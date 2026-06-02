@@ -82,8 +82,13 @@ DISTANCE_THRESHOLD_PIXELS = float(os.getenv("DISTANCE_THRESHOLD_PIXELS", "60"))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 
 # Chunked processing
-CHUNK_DURATION_MIN = float(os.getenv("CHUNK_DURATION_MIN", "5"))    # minutes per chunk
+CHUNK_DURATION_MIN = float(os.getenv("CHUNK_DURATION_MIN", "4"))    # minutes per chunk
 CHUNK_OVERLAP_SEC  = float(os.getenv("CHUNK_OVERLAP_SEC",  "10"))   # overlap prepended to each non-first chunk
 VIDEO_START_SEC    = float(os.getenv("VIDEO_START_SEC",    "0"))    # analysis start offset (seconds)
 _video_end_raw     = os.getenv("VIDEO_END_SEC")
 VIDEO_END_SEC      = float(_video_end_raw) if _video_end_raw is not None else None  # None = full video
+
+# Frame scaling — reduce RAM when loading video
+# 1.0 = original (~6 MB/frame at 1080p)   0.5 = half res (~1.5 MB, safe for 13 GB Kaggle + 4-min chunks)
+# 0.33 = YOLO-native width (~0.67 MB, fallback for <8 GB environments)
+FRAME_SCALE = float(os.getenv("FRAME_SCALE", "0.5"))
