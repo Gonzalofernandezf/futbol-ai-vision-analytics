@@ -83,7 +83,7 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 
 # Chunked processing
 CHUNK_DURATION_MIN = float(os.getenv("CHUNK_DURATION_MIN", "5"))    # minutes per chunk
-CHUNK_OVERLAP_SEC  = float(os.getenv("CHUNK_OVERLAP_SEC",  "3"))    # overlap prepended to each non-first chunk
+CHUNK_OVERLAP_SEC  = float(os.getenv("CHUNK_OVERLAP_SEC",  "10"))   # overlap prepended to each non-first chunk
 VIDEO_START_SEC    = float(os.getenv("VIDEO_START_SEC",    "0"))    # analysis start offset (seconds)
 _video_end_raw     = os.getenv("VIDEO_END_SEC")
 VIDEO_END_SEC      = float(_video_end_raw) if _video_end_raw is not None else None  # None = full video

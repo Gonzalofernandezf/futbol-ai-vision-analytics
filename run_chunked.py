@@ -99,9 +99,13 @@ def _match_ids(prev_json, curr_json, overlap_sec, fps):
         if pos is not None:
             prev_pos[pid] = pos
 
+    # Use the second half of the overlap window to compute curr positions.
+    # ByteTrack needs ~15 frames to stabilise IDs; skipping the first half avoids
+    # averaging over unreliable early tracks.
+    half = n // 2
     curr_pos = {}
     for pid, pdata in curr_json.get("players", {}).items():
-        pos = _mean_pos(pdata.get("position_history", []), n)
+        pos = _mean_pos(pdata.get("position_history", [])[half:n], n - half)
         if pos is not None:
             curr_pos[pid] = pos
 
@@ -118,6 +122,11 @@ def _match_ids(prev_json, curr_json, overlap_sec, fps):
         if best_pid is not None:
             mapping[cid] = best_pid
             used.add(best_pid)
+
+    total     = len(curr_pos)
+    matched   = len(mapping)
+    print(f"   🔗 ID match: {matched}/{total} players matched "
+          f"({total - matched} unmatched → new IDs)")
 
     return mapping
 
