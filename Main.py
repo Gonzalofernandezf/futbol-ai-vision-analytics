@@ -319,81 +319,58 @@ def main():
     #            tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[id_equipo_blanco]
     # -----------FIN BLOQUE COMENTADO COMPLETO PORQUE APLICA PARA OTRO VIDEO--------------------------
 
-    # 9. Draw
-    print("🎨 Drawing ellipses and triangles...")
-    # First draw the tracker annotations (ellipses, etc.)
-    output_video_frames = tracker.draw_annotations(video_frames, tracks)
-
-    # Draw camera movement
-    output_video_frames = camera_movement_estimator.draw_camera_movement(output_video_frames, camera_movement_per_frame)
-
-    team_ball_control = np.array(team_ball_control)
-    
-    # Draw possession frame-by-frame
-    print("📊 Stamping possession statistics...")
-    for frame_num, frame in enumerate(output_video_frames):
-        # Call the new function passing the individual frame and frame number
-        output_video_frames[frame_num] = tracker.draw_team_ball_control(frame, frame_num, team_ball_control)
-    
-    # Draw speed and distance
-    # Do this BEFORE drawing possession so the text appears 'under' graphic overlays if present
-    output_video_frames = speed_and_distance_estimator.draw_speed_and_distance(output_video_frames, tracks)
-    
-    # 10. Save Video
-    print(f"💾 Saving final video to {output_path}...")
-    save_video(output_video_frames, output_path, fps)
-    print("✅ Done! Check the new video.")
-
-    # 11. Data export (Historical)
-    # Initialize the exporter
+    # 9. Data export — siempre, ANTES de dibujar, para no perder stats si hay OOM al dibujar
     exporter = GameStatsExporter(fps=fps)
-
-    # 1. Define the Historical name (based on the video name v6, v7...)
-    # This will save '..._output_elipses_v6_stats.json' in the output_videos folder
     json_output_path = output_path.replace('.mp4', '_stats.json')
 
-    # 1. Retrieve the full list of who had the ball
-    # team_ball_control is a list like [1, 1, 1, 2, 2, 1...]
     team_ball_control_np = np.array(team_ball_control)
-    
-    # 2. Count how many times 1 and 2 appear throughout the match
     team1_frames = np.sum(team_ball_control_np == 1)
     team2_frames = np.sum(team_ball_control_np == 2)
     total_valid_frames = team1_frames + team2_frames
-
-    # 3. Calculate percentages (avoiding division by zero)
     if total_valid_frames > 0:
         home_poss = (team1_frames / total_valid_frames) * 100
         away_poss = (team2_frames / total_valid_frames) * 100
     else:
         home_poss, away_poss = 0, 0
 
-    # 4. CALL TO THE EXPORTER (This connects with Step 1)
     exporter.export_json(tracks, json_output_path, home_possession=home_poss, away_possession=away_poss, view_transformer=view_transformer)
     print(f" 💾  Historical data saved to: {json_output_path}")
 
-    # 12. Auto-deploy to demo folder (Generic copy)
-    print(" 🚀  Updating web demo...")
+    # 10. Draw + save video (skip on memory-constrained envs with SKIP_VIDEO_OUTPUT=true)
+    if config.SKIP_VIDEO_OUTPUT:
+        print("⏭️  SKIP_VIDEO_OUTPUT=true — skipping annotated video render.")
+    else:
+        print("🎨 Drawing ellipses and triangles...")
+        output_video_frames = tracker.draw_annotations(video_frames, tracks)
 
-    # Define the demo folder from config
+        output_video_frames = camera_movement_estimator.draw_camera_movement(output_video_frames, camera_movement_per_frame)
+
+        team_ball_control_arr = np.array(team_ball_control)
+        print("📊 Stamping possession statistics...")
+        for frame_num, frame in enumerate(output_video_frames):
+            output_video_frames[frame_num] = tracker.draw_team_ball_control(frame, frame_num, team_ball_control_arr)
+
+        output_video_frames = speed_and_distance_estimator.draw_speed_and_distance(output_video_frames, tracks)
+
+        print(f"💾 Saving final video to {output_path}...")
+        save_video(output_video_frames, output_path, fps)
+        print("✅ Done! Check the new video.")
+
+    # 11. Auto-deploy to demo folder
+    print(" 🚀  Updating web demo...")
     demo_dir = config.DEMO_DIR
     if not os.path.exists(demo_dir):
         os.makedirs(demo_dir)
 
-    # Define the GENERIC names expected by the HTML
-    # The HTML will always look for 'demo_video.mp4' and 'match_data.json'
-    demo_video_dest = os.path.join(demo_dir, 'demo_video.mp4')
     demo_json_dest = os.path.join(demo_dir, 'match_data.json')
-
-    # Copy and rename automatically
-    # Copy the video v6 -> demo_video.mp4
-    shutil.copy(output_path, demo_video_dest)
-    
-    # Copy the json v6 -> match_data.json
     shutil.copy(json_output_path, demo_json_dest)
 
+    if not config.SKIP_VIDEO_OUTPUT:
+        demo_video_dest = os.path.join(demo_dir, 'demo_video.mp4')
+        shutil.copy(output_path, demo_video_dest)
+        print(f"     Video: {demo_video_dest}")
+
     print(f" ✅  Demo actualizada en la carpeta '{demo_dir}'")
-    print(f"     Video: {demo_video_dest}")
     print(f"     JSON:  {demo_json_dest}")
 
 if __name__ == '__main__':
