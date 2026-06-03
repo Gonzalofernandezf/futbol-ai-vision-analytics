@@ -76,7 +76,7 @@ class ViewTransformer():
 
         # Batched inference: launching the field model frame-by-frame leaves the GPU
         # idle between launches. Process in chunks so CUDA kernels stay saturated.
-        batch_size = 20
+        batch_size  = _cfg.YOLO_BATCH_SIZE_FIELD
         total_frames = len(video_frames)
 
         for batch_start in range(0, total_frames, batch_size):

@@ -34,6 +34,11 @@ YOLO_TRACKER = os.getenv("YOLO_TRACKER", "bytetrack.yaml")
 # Auto-disabled when running on CPU (FP16 on CPU is slower than FP32).
 YOLO_HALF = os.getenv("YOLO_HALF", "true").lower() == "true" and YOLO_DEVICE != "cpu"
 
+# Inference batch size. Larger = fewer kernel launches = better GPU saturation,
+# at the cost of VRAM. On Kaggle T4 (15 GB) 40-60 is safe with FP16; OOM → lower.
+YOLO_BATCH_SIZE_TRACKER = int(os.getenv("YOLO_BATCH_SIZE_TRACKER", "40"))
+YOLO_BATCH_SIZE_FIELD   = int(os.getenv("YOLO_BATCH_SIZE_FIELD",   "40"))
+
 # Processing parameters
 FRAME_WINDOW = int(os.getenv("FRAME_WINDOW", "5"))
 MAX_SPEED_KMH = float(os.getenv("MAX_SPEED_KMH", "32"))   # techo biomecánico para fútbol base/semipro

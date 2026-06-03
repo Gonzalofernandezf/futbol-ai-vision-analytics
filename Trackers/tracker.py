@@ -44,7 +44,7 @@ class Tracker:
         )
 
     def detect_frames(self, frames):
-        batch_size = 20
+        batch_size = _cfg.YOLO_BATCH_SIZE_TRACKER
         detections = []
         for i in range(0, len(frames), batch_size):
             # 'iou' obliga a YOLO a borrar cajas que se solapen más de ese ratio.
