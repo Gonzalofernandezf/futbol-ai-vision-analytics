@@ -74,59 +74,68 @@ class ViewTransformer():
         frames_con_matriz = 0
         class_hit_count = {cls_id: 0 for cls_id in self.target_vertices_dict}
 
-        for frame_num, frame in enumerate(video_frames):
-            resultados_cancha = self.modelo_cancha(
-                frame,
+        # Batched inference: launching the field model frame-by-frame leaves the GPU
+        # idle between launches. Process in chunks so CUDA kernels stay saturated.
+        batch_size = 20
+        total_frames = len(video_frames)
+
+        for batch_start in range(0, total_frames, batch_size):
+            batch = video_frames[batch_start:batch_start + batch_size]
+            batch_results = self.modelo_cancha(
+                batch,
                 verbose=False,
                 device=_cfg.YOLO_DEVICE,
                 half=_cfg.YOLO_HALF,
-            )[0]
+            )
 
-            pts_pixeles = []
-            pts_metros = []
+            for offset, resultados_cancha in enumerate(batch_results):
+                frame_num = batch_start + offset
 
-            # Modelo de detección: cada bbox es un keypoint identificado por su class_id.
-            # Si el mismo class_id aparece varias veces, nos quedamos con el de mayor confianza.
-            if len(resultados_cancha.boxes) > 0:
-                boxes  = resultados_cancha.boxes
-                xyxy   = boxes.xyxy.cpu().numpy()
-                cls_ids = boxes.cls.cpu().numpy().astype(int)
-                confs  = boxes.conf.cpu().numpy()
+                pts_pixeles = []
+                pts_metros = []
 
-                best_per_class = {}  # {class_id: (conf, center_x, center_y)}
-                for box, cls_id, conf in zip(xyxy, cls_ids, confs):
-                    if conf < 0.25 or cls_id not in self.target_vertices_dict:
-                        continue
-                    if cls_id not in best_per_class or conf > best_per_class[cls_id][0]:
-                        cx = (box[0] + box[2]) / 2.0
-                        cy = (box[1] + box[3]) / 2.0
-                        best_per_class[cls_id] = (conf, cx, cy)
+                # Modelo de detección: cada bbox es un keypoint identificado por su class_id.
+                # Si el mismo class_id aparece varias veces, nos quedamos con el de mayor confianza.
+                if len(resultados_cancha.boxes) > 0:
+                    boxes  = resultados_cancha.boxes
+                    xyxy   = boxes.xyxy.cpu().numpy()
+                    cls_ids = boxes.cls.cpu().numpy().astype(int)
+                    confs  = boxes.conf.cpu().numpy()
 
-                for cls_id, (_, cx, cy) in best_per_class.items():
-                    pts_pixeles.append([cx, cy])
-                    pts_metros.append(self.target_vertices_dict[cls_id])
-                    class_hit_count[cls_id] += 1
+                    best_per_class = {}  # {class_id: (conf, center_x, center_y)}
+                    for box, cls_id, conf in zip(xyxy, cls_ids, confs):
+                        if conf < 0.25 or cls_id not in self.target_vertices_dict:
+                            continue
+                        if cls_id not in best_per_class or conf > best_per_class[cls_id][0]:
+                            cx = (box[0] + box[2]) / 2.0
+                            cy = (box[1] + box[3]) / 2.0
+                            best_per_class[cls_id] = (conf, cx, cy)
 
-            if len(pts_pixeles) >= 4:
-                matriz, _ = cv2.findHomography(
-                    np.array(pts_pixeles, dtype=np.float32),
-                    np.array(pts_metros,  dtype=np.float32),
-                    cv2.RANSAC, 5.0
-                )
-                if matriz is not None:
-                    self.matrices_por_frame[frame_num] = matriz
-                    self.ultima_matriz_valida = matriz
-                    frames_con_matriz += 1
+                    for cls_id, (_, cx, cy) in best_per_class.items():
+                        pts_pixeles.append([cx, cy])
+                        pts_metros.append(self.target_vertices_dict[cls_id])
+                        class_hit_count[cls_id] += 1
+
+                if len(pts_pixeles) >= 4:
+                    matriz, _ = cv2.findHomography(
+                        np.array(pts_pixeles, dtype=np.float32),
+                        np.array(pts_metros,  dtype=np.float32),
+                        cv2.RANSAC, 5.0
+                    )
+                    if matriz is not None:
+                        self.matrices_por_frame[frame_num] = matriz
+                        self.ultima_matriz_valida = matriz
+                        frames_con_matriz += 1
+                    else:
+                        self.matrices_por_frame[frame_num] = self.ultima_matriz_valida
                 else:
                     self.matrices_por_frame[frame_num] = self.ultima_matriz_valida
-            else:
-                self.matrices_por_frame[frame_num] = self.ultima_matriz_valida
 
-            # Diagnóstico solo en el primer frame para no saturar el log
-            if frame_num == 0:
-                print(f"   Frame 0: {len(pts_pixeles)} puntos de cancha detectados con conf>0.25")
+                # Diagnóstico solo en el primer frame para no saturar el log
+                if frame_num == 0:
+                    print(f"   Frame 0: {len(pts_pixeles)} puntos de cancha detectados con conf>0.25")
 
-        total = len(video_frames)
+        total = total_frames
         print(f"   Matrices calculadas: {frames_con_matriz}/{total} frames ({frames_con_matriz/total*100:.0f}%)")
         print("   Detecciones por clase (cuántos frames detectó cada punto):")
         class_names = self.modelo_cancha.names
