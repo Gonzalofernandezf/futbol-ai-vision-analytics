@@ -53,6 +53,9 @@ class Tracker:
                 frames[i:i+batch_size],
                 conf=_cfg.YOLO_BALL_CONF,
                 iou=_cfg.YOLO_BALL_IOU,
+                device=_cfg.YOLO_DEVICE,
+                half=_cfg.YOLO_HALF,
+                verbose=False,
             )
             detections += detections_batch
         return detections

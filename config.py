@@ -30,6 +30,9 @@ YOLO_IOU = float(os.getenv("YOLO_IOU", "0.5"))
 YOLO_IMGSZ = int(os.getenv("YOLO_IMGSZ", "1280"))
 YOLO_DEVICE = os.getenv("YOLO_DEVICE", "cpu")
 YOLO_TRACKER = os.getenv("YOLO_TRACKER", "bytetrack.yaml")
+# FP16 inference: ~2x faster on CUDA GPUs (T4, P100, etc.) with no perceptible quality loss.
+# Auto-disabled when running on CPU (FP16 on CPU is slower than FP32).
+YOLO_HALF = os.getenv("YOLO_HALF", "true").lower() == "true" and YOLO_DEVICE != "cpu"
 
 # Processing parameters
 FRAME_WINDOW = int(os.getenv("FRAME_WINDOW", "5"))

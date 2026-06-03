@@ -1,6 +1,7 @@
-import numpy as np 
-import cv2 
+import numpy as np
+import cv2
 from ultralytics import YOLO # AÑADIDO: Para cargar tu best.pt
+import config as _cfg
 
 """
 Perspective Transformation Module
@@ -74,7 +75,12 @@ class ViewTransformer():
         class_hit_count = {cls_id: 0 for cls_id in self.target_vertices_dict}
 
         for frame_num, frame in enumerate(video_frames):
-            resultados_cancha = self.modelo_cancha(frame, verbose=False)[0]
+            resultados_cancha = self.modelo_cancha(
+                frame,
+                verbose=False,
+                device=_cfg.YOLO_DEVICE,
+                half=_cfg.YOLO_HALF,
+            )[0]
 
             pts_pixeles = []
             pts_metros = []
