@@ -39,6 +39,20 @@ YOLO_HALF = os.getenv("YOLO_HALF", "true").lower() == "true" and YOLO_DEVICE != 
 YOLO_BATCH_SIZE_TRACKER = int(os.getenv("YOLO_BATCH_SIZE_TRACKER", "40"))
 YOLO_BATCH_SIZE_FIELD   = int(os.getenv("YOLO_BATCH_SIZE_FIELD",   "40"))
 
+# Per-model device override. Useful on multi-GPU hosts (Kaggle T4 x2):
+#   YOLO_DEVICE_TRACKER=cuda:0  YOLO_DEVICE_FIELD=cuda:1
+# Default: fall back to YOLO_DEVICE so single-GPU setups keep working.
+YOLO_DEVICE_TRACKER = os.getenv("YOLO_DEVICE_TRACKER", YOLO_DEVICE)
+YOLO_DEVICE_FIELD   = os.getenv("YOLO_DEVICE_FIELD",   YOLO_DEVICE)
+
+# Run tracker, field-keypoint detection and camera-movement optical flow in
+# parallel threads (they don't share state; YOLO + OpenCV release the GIL).
+# Auto-disabled on CPU since three CPU-bound threads contend for the same core.
+PARALLEL_INFERENCE = (
+    os.getenv("PARALLEL_INFERENCE", "true").lower() == "true"
+    and YOLO_DEVICE != "cpu"
+)
+
 # Processing parameters
 FRAME_WINDOW = int(os.getenv("FRAME_WINDOW", "5"))
 MAX_SPEED_KMH = float(os.getenv("MAX_SPEED_KMH", "32"))   # techo biomecánico para fútbol base/semipro

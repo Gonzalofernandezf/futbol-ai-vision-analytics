@@ -30,16 +30,21 @@ class Tracker:
     def __init__(self, model_path):
         """
         Initialize tracker with YOLO model.
-        
+
         Args:
             model_path (str): Path to YOLO model weights (e.g., 'best_100e.pt')
         """
+        self.device = _cfg.YOLO_DEVICE_TRACKER
         self.model = YOLO(model_path)
-        # We increase the buffer to 90 frames (approx 3-4 seconds) to keep IDs 
+        # Move weights to target device up-front so the first predict() call
+        # doesn't pay a cold-start cost (matters when running in a thread).
+        if "cuda" in self.device:
+            self.model.to(self.device)
+        # We increase the buffer to 90 frames (approx 3-4 seconds) to keep IDs
         # even if the player is occluded or blurred for a while.
         self.tracker = sv.ByteTrack(
             track_activation_threshold=0.25,
-            lost_track_buffer=100, 
+            lost_track_buffer=100,
             minimum_matching_threshold=0.8
         )
 
@@ -53,7 +58,7 @@ class Tracker:
                 frames[i:i+batch_size],
                 conf=_cfg.YOLO_BALL_CONF,
                 iou=_cfg.YOLO_BALL_IOU,
-                device=_cfg.YOLO_DEVICE,
+                device=self.device,
                 half=_cfg.YOLO_HALF,
                 verbose=False,
             )

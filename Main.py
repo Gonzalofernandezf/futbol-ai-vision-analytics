@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from utils.video_utils import read_video, save_video
 from utils.perf_monitor import PhaseTimer, run_sanity_checks
 from Trackers.tracker import Tracker
@@ -91,16 +92,45 @@ def main():
     with timer.phase("Read video"):
         video_frames, fps = read_video(video_path, segments=segmentos_partido)
 
-    # 3. Initialize Tracker
+    # 3. Initialize all GPU/CPU-heavy components up front so we can dispatch them
+    #    in parallel below. Tracker (GPU), ViewTransformer (GPU on possibly a
+    #    different device), and CameraMovementEstimator (CPU optical flow) all
+    #    read video_frames read-only and write to disjoint state — safe to run
+    #    in threads. YOLO + OpenCV release the GIL during heavy work.
     tracker = Tracker(model_path)
+    view_transformer = ViewTransformer(model_path=config.MODELO_CANCHA_PATH)
+    camera_movement_estimator = CameraMovementEstimator(video_frames[0])
 
-    # 4. Get tracks (this will be instant now!)
-    with timer.phase("Tracker detect"):
-        tracks = tracker.get_object_tracks(
-            video_frames,
-            read_from_stub=False,
-            stub_path=stub_path
-        )
+    if config.PARALLEL_INFERENCE:
+        with timer.phase("Parallel inference (tracker+field+camera)"):
+            with ThreadPoolExecutor(max_workers=3) as ex:
+                f_tracks = ex.submit(
+                    tracker.get_object_tracks,
+                    video_frames, False, stub_path,
+                )
+                f_field = ex.submit(
+                    view_transformer.calcular_matrices_para_video,
+                    video_frames,
+                )
+                f_camera = ex.submit(
+                    camera_movement_estimator.get_camera_movement,
+                    video_frames, False, 'stubs/camera_movement_stub.pkl',
+                )
+                tracks                    = f_tracks.result()
+                f_field.result()
+                camera_movement_per_frame = f_camera.result()
+    else:
+        with timer.phase("Tracker detect"):
+            tracks = tracker.get_object_tracks(
+                video_frames, read_from_stub=False, stub_path=stub_path,
+            )
+        with timer.phase("Field keypoints"):
+            view_transformer.calcular_matrices_para_video(video_frames)
+        with timer.phase("Camera movement (flow)"):
+            camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
+                video_frames, read_from_stub=False,
+                stub_path='stubs/camera_movement_stub.pkl',
+            )
 
     # Ball interpolation
     print("⚽ Interpolating ball positions...")
@@ -150,32 +180,13 @@ def main():
     else:
         print("⚠️ No players detected in frame 0 for cropping.")
 
-    # 6. Camera Movement Estimation
-
-    camera_movement_estimator = CameraMovementEstimator(video_frames[0])
-
-    with timer.phase("Camera movement"):
-        # 1. Calculate how much the camera moves in X and Y
-        camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
-            video_frames,
-            read_from_stub=False,
-            stub_path='stubs/camera_movement_stub.pkl'
-        )
-
-        # 2. Adjust players' positions by subtracting the camera movement
-        # (This creates the 'position_adjusted' field that we'll use later)
+    # 6. Camera movement adjustment + perspective transform → metres
+    #    (Both inputs already computed above; this block only writes derived
+    #    fields into tracks.)
+    with timer.phase("Camera adjust"):
         camera_movement_estimator.add_adjust_positions_to_tracks(tracks, camera_movement_per_frame)
 
-    # 6.3 Transformación de Perspectiva Dinámica con IA
-    # Auto-detecta el tipo de modelo (pose vs detect) y usa el mapping correcto
-    view_transformer = ViewTransformer(model_path=config.MODELO_CANCHA_PATH)
-
-    with timer.phase("Field keypoints"):
-        # NUEVO PASO: Le pedimos a la IA que mire todo el video y calcule todas las matrices primero
-        view_transformer.calcular_matrices_para_video(video_frames)
-
     with timer.phase("Transform tracks"):
-        # Luego, asignamos los metros a los tracks como hacías normalmente
         view_transformer.add_transformed_position_to_tracks(tracks)
 
     print(" 📐  Perspective transformed: Coordinates in meters calculated.")

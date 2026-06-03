@@ -26,8 +26,13 @@ class ViewTransformer():
     """
     
     def __init__(self, model_path='modelo_cancha.pt'):
+        self.device = _cfg.YOLO_DEVICE_FIELD
         self.modelo_cancha = YOLO(model_path)
-        print(f"🏟️  Modelo cancha: task={self.modelo_cancha.task}  clases={self.modelo_cancha.names}")
+        # Move weights to target device up-front so the first predict() call
+        # doesn't pay a cold-start cost (matters when running in a thread).
+        if "cuda" in self.device:
+            self.modelo_cancha.to(self.device)
+        print(f"🏟️  Modelo cancha: task={self.modelo_cancha.task}  device={self.device}  clases={self.modelo_cancha.names}")
 
         # Mapeo class_id → coordenadas reales (metros).
         # Orden según data.yaml exportado de Roboflow (alfabético por nombre de clase).
@@ -84,7 +89,7 @@ class ViewTransformer():
             batch_results = self.modelo_cancha(
                 batch,
                 verbose=False,
-                device=_cfg.YOLO_DEVICE,
+                device=self.device,
                 half=_cfg.YOLO_HALF,
             )
 
