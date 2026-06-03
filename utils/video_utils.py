@@ -2,7 +2,7 @@ import cv2
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import FRAME_SCALE
+from config import FRAME_SCALE, VIDEO_CODEC
 
 def _scale(frame):
     if FRAME_SCALE == 1.0:
@@ -58,8 +58,7 @@ def save_video(output_video_frames, output_video_path, fps=25):
     
     height, width, _ = output_video_frames[0].shape
     
-    # We use 'vp09'. Allows to be presented on the HTML MVP 
-    fourcc = cv2.VideoWriter_fourcc(*'vp09') 
+    fourcc = cv2.VideoWriter_fourcc(*VIDEO_CODEC)
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
     
     for frame in output_video_frames:

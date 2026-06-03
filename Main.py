@@ -343,7 +343,7 @@ def main():
     else:
         print("🎨 Rendering annotated video (streaming)...")
         h, w = video_frames[0].shape[:2]
-        fourcc = cv2.VideoWriter_fourcc(*'vp09')
+        fourcc = cv2.VideoWriter_fourcc(*config.VIDEO_CODEC)
         writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
         team_ball_control_arr = np.array(team_ball_control)

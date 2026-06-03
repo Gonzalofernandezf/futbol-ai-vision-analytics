@@ -96,3 +96,7 @@ FRAME_SCALE = float(os.getenv("FRAME_SCALE", "0.5"))
 # Skip annotated video output — set True on memory-constrained envs (Kaggle, CI).
 # JSON stats are always exported regardless of this flag.
 SKIP_VIDEO_OUTPUT = os.getenv("SKIP_VIDEO_OUTPUT", "false").lower() == "true"
+
+# Video output codec. vp09 = VP9 (browser-compatible but slow to encode ~0.5 fps on CPU).
+# Use mp4v for fast encoding (~100 fps) when browser compatibility is not needed (e.g. Kaggle).
+VIDEO_CODEC = os.getenv("VIDEO_CODEC", "vp09")
