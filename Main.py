@@ -1,4 +1,5 @@
 from utils.video_utils import read_video, save_video
+from utils.perf_monitor import PhaseTimer, run_sanity_checks
 from Trackers.tracker import Tracker
 from team_assigner.team_assigner import TeamAssigner
 from datetime import datetime
@@ -68,15 +69,17 @@ def get_dynamic_output_path(output_dir, base_name="output_elipses"):
         version += 1
 
 def main():
+    timer = PhaseTimer()
+
     # 1. Configuration - Import from config module
     video_path = config.VIDEO_PATH
-    model_path = config.MODEL_PATH 
+    model_path = config.MODEL_PATH
     stub_path = config.STUB_PATH
-    output_dir = config.OUTPUT_DIR 
-    
+    output_dir = config.OUTPUT_DIR
+
     # The function automatically calculates whether it touches v1, v2, v3...
     output_path = get_dynamic_output_path(output_dir)
-    
+
     print(f"📁 Video will be saved as: {output_path}")
 
     # 2. Leer Video — rango controlado por VIDEO_START_SEC / VIDEO_END_SEC (config / .env)
@@ -84,23 +87,25 @@ def main():
         segmentos_partido = [(config.VIDEO_START_SEC, config.VIDEO_END_SEC)]
     else:
         segmentos_partido = None  # lee el vídeo completo
-    
-    # Llamamos a la nueva función pasándole los segmentos
-    video_frames, fps = read_video(video_path, segments=segmentos_partido)
+
+    with timer.phase("Read video"):
+        video_frames, fps = read_video(video_path, segments=segmentos_partido)
 
     # 3. Initialize Tracker
     tracker = Tracker(model_path)
 
     # 4. Get tracks (this will be instant now!)
-    tracks = tracker.get_object_tracks(
-        video_frames, 
-        read_from_stub=False, 
-        stub_path=stub_path
-    )
+    with timer.phase("Tracker detect"):
+        tracks = tracker.get_object_tracks(
+            video_frames,
+            read_from_stub=False,
+            stub_path=stub_path
+        )
 
     # Ball interpolation
     print("⚽ Interpolating ball positions...")
-    tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
+    with timer.phase("Ball interpolate"):
+        tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
 
     # 5. Player crop block 
     # 1. Create output directory if it doesn't exist (AUTOMATION)
@@ -146,29 +151,32 @@ def main():
         print("⚠️ No players detected in frame 0 for cropping.")
 
     # 6. Camera Movement Estimation
-    
-    camera_movement_estimator = CameraMovementEstimator(video_frames[0])
-    
-    # 1. Calculate how much the camera moves in X and Y
-    camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
-        video_frames,
-        read_from_stub=False,
-        stub_path='stubs/camera_movement_stub.pkl'
-    )
 
-    # 2. Adjust players' positions by subtracting the camera movement
-    # (This creates the 'position_adjusted' field that we'll use later)
-    camera_movement_estimator.add_adjust_positions_to_tracks(tracks, camera_movement_per_frame)
-    
+    camera_movement_estimator = CameraMovementEstimator(video_frames[0])
+
+    with timer.phase("Camera movement"):
+        # 1. Calculate how much the camera moves in X and Y
+        camera_movement_per_frame = camera_movement_estimator.get_camera_movement(
+            video_frames,
+            read_from_stub=False,
+            stub_path='stubs/camera_movement_stub.pkl'
+        )
+
+        # 2. Adjust players' positions by subtracting the camera movement
+        # (This creates the 'position_adjusted' field that we'll use later)
+        camera_movement_estimator.add_adjust_positions_to_tracks(tracks, camera_movement_per_frame)
+
     # 6.3 Transformación de Perspectiva Dinámica con IA
     # Auto-detecta el tipo de modelo (pose vs detect) y usa el mapping correcto
     view_transformer = ViewTransformer(model_path=config.MODELO_CANCHA_PATH)
-    
-    # NUEVO PASO: Le pedimos a la IA que mire todo el video y calcule todas las matrices primero
-    view_transformer.calcular_matrices_para_video(video_frames)
-    
-    # Luego, asignamos los metros a los tracks como hacías normalmente
-    view_transformer.add_transformed_position_to_tracks(tracks)
+
+    with timer.phase("Field keypoints"):
+        # NUEVO PASO: Le pedimos a la IA que mire todo el video y calcule todas las matrices primero
+        view_transformer.calcular_matrices_para_video(video_frames)
+
+    with timer.phase("Transform tracks"):
+        # Luego, asignamos los metros a los tracks como hacías normalmente
+        view_transformer.add_transformed_position_to_tracks(tracks)
 
     print(" 📐  Perspective transformed: Coordinates in meters calculated.")
 
@@ -177,103 +185,108 @@ def main():
     # The speed filter removes physically impossible jumps; the static-cluster filter
     # then removes long stretches where the "ball" doesn't move in real-world metres
     # (pitch stains, socks, centre-spot artefacts the speed filter can't catch).
-    tracks["ball"] = tracker.filter_ball_positions_by_speed(
-        tracks["ball"],
-        fps,
-        max_speed_mps  = config.BALL_MAX_SPEED_MPS,
-        pitch_length   = config.PITCH_LENGTH_M,
-        pitch_width    = config.PITCH_WIDTH_M,
-        pitch_margin   = config.PITCH_MARGIN_M,
-    )
+    with timer.phase("Ball filters"):
+        tracks["ball"] = tracker.filter_ball_positions_by_speed(
+            tracks["ball"],
+            fps,
+            max_speed_mps  = config.BALL_MAX_SPEED_MPS,
+            pitch_length   = config.PITCH_LENGTH_M,
+            pitch_width    = config.PITCH_WIDTH_M,
+            pitch_margin   = config.PITCH_MARGIN_M,
+        )
 
-    tracks["ball"] = tracker.filter_static_ball_clusters(
-        tracks["ball"],
-        fps           = fps,
-        radius_m      = config.BALL_STATIC_RADIUS_M,
-        window_frames = config.BALL_STATIC_WINDOW_FRAMES,
-    )
+        tracks["ball"] = tracker.filter_static_ball_clusters(
+            tracks["ball"],
+            fps           = fps,
+            radius_m      = config.BALL_STATIC_RADIUS_M,
+            window_frames = config.BALL_STATIC_WINDOW_FRAMES,
+        )
 
-    # 6.8. Speed and distance estimation 
+    # 6.8. Speed and distance estimation
     speed_and_distance_estimator = SpeedAndDistance_Estimator()
     # Important: Pass the video's real FPS so the calculation is accurate
-    speed_and_distance_estimator.frame_rate = fps 
-    
-    speed_and_distance_estimator.add_speed_and_distance_to_tracks(tracks)
+    speed_and_distance_estimator.frame_rate = fps
+
+    with timer.phase("Speed/distance"):
+        speed_and_distance_estimator.add_speed_and_distance_to_tracks(tracks)
     print(" 🚀  Speed and distance calculated.")
-    
+
     # 7. Team logic
     team_assigner = TeamAssigner()
-    
+
     # Send the first frame containing players so it can 'learn' jersey colors
     team_assigner.assign_team_color(video_frames[0], tracks['players'][0])
 
     print("🧠 Assigning teams to each player...")
-    
-    for frame_num, player_track in enumerate(tracks['players']):
-        for player_id, track in player_track.items():
-            # Identify the team (1 or 2)
-            team = team_assigner.get_player_team(video_frames[frame_num], track['bbox'], player_id)
-            
-            # Save the data in the tracks dictionary
-            tracks['players'][frame_num][player_id]['team'] = team 
-            tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team]
+
+    with timer.phase("Team assignment"):
+        for frame_num, player_track in enumerate(tracks['players']):
+            for player_id, track in player_track.items():
+                # Identify the team (1 or 2)
+                team = team_assigner.get_player_team(video_frames[frame_num], track['bbox'], player_id)
+
+                # Save the data in the tracks dictionary
+                tracks['players'][frame_num][player_id]['team'] = team
+                tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team]
 
     print(f"🎨 Colors detected - Team 1: {team_assigner.team_colors[1]}, Team 2: {team_assigner.team_colors[2]}")
 
     # 7.5 Team correction (VOTING)
     # This prevents the color from flickering if the AI is confused in a single frame.
     print("⚖️ Adjusting teams by majority voting...")
-    
-    player_team_votes = {} # Dictionary to save the votes: {player_id: [1, 1, 2, 1...]}
 
-    # 1. Collect all the "votes" from each frame
-    for frame_num, player_track in enumerate(tracks['players']):
-        for player_id, track in player_track.items():
-            team = track['team']
-            
-            if player_id not in player_team_votes:
-                player_team_votes[player_id] = []
-            
-            player_team_votes[player_id].append(team)
+    with timer.phase("Team voting"):
+        player_team_votes = {} # Dictionary to save the votes: {player_id: [1, 1, 2, 1...]}
 
-    # 2. Count votes and correct the past
-    for player_id, votes in player_team_votes.items():
-        # Compute the MODE (the most frequent value)
-        # Example: If votes is [1, 1, 1, 2, 1], the winner is 1.
-        team_winner = max(set(votes), key=votes.count)
-        
-        # 3. Overwrite the definitive team in ALL frames
-        for frame_num in range(len(tracks['players'])):
-            if player_id in tracks['players'][frame_num]:
-                tracks['players'][frame_num][player_id]['team'] = team_winner
-                tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team_winner]
-    
+        # 1. Collect all the "votes" from each frame
+        for frame_num, player_track in enumerate(tracks['players']):
+            for player_id, track in player_track.items():
+                team = track['team']
+
+                if player_id not in player_team_votes:
+                    player_team_votes[player_id] = []
+
+                player_team_votes[player_id].append(team)
+
+        # 2. Count votes and correct the past
+        for player_id, votes in player_team_votes.items():
+            # Compute the MODE (the most frequent value)
+            # Example: If votes is [1, 1, 1, 2, 1], the winner is 1.
+            team_winner = max(set(votes), key=votes.count)
+
+            # 3. Overwrite the definitive team in ALL frames
+            for frame_num in range(len(tracks['players'])):
+                if player_id in tracks['players'][frame_num]:
+                    tracks['players'][frame_num][player_id]['team'] = team_winner
+                    tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team_winner]
+
     # 8. Assign Ball possession
     player_assigner = PlayerBallAssigner()
     team_ball_control = [] # To save what team has the ball on each frame
 
     print("⚽ Calculating ball possession...")
-    for frame_num, player_track in enumerate(tracks['players']):
-        # --- FIX: ACCESO SEGURO A LA PELOTA ---
-        ball_dict = tracks['ball'][frame_num]
-        
-        # Verificamos si la IA realmente detectó una pelota con el ID 1 en este frame
-        if 1 in ball_dict:
-            ball_bbox = ball_dict[1]['bbox']
-            assigned_player = player_assigner.assign_ball_to_player(player_track, ball_bbox)
+    with timer.phase("Ball possession"):
+        for frame_num, player_track in enumerate(tracks['players']):
+            # --- FIX: ACCESO SEGURO A LA PELOTA ---
+            ball_dict = tracks['ball'][frame_num]
 
-            if assigned_player != -1:
-                tracks['players'][frame_num][assigned_player]['has_ball'] = True
-                team_id = tracks['players'][frame_num][assigned_player]['team']
-                team_ball_control.append(team_id)
+            # Verificamos si la IA realmente detectó una pelota con el ID 1 en este frame
+            if 1 in ball_dict:
+                ball_bbox = ball_dict[1]['bbox']
+                assigned_player = player_assigner.assign_ball_to_player(player_track, ball_bbox)
+
+                if assigned_player != -1:
+                    tracks['players'][frame_num][assigned_player]['has_ball'] = True
+                    team_id = tracks['players'][frame_num][assigned_player]['team']
+                    team_ball_control.append(team_id)
+                else:
+                    # Nadie la tiene clara, mantenemos posesión anterior
+                    team_ball_control.append(team_ball_control[-1] if team_ball_control else None)
             else:
-                # Nadie la tiene clara, mantenemos posesión anterior
+                # La pelota desapareció o no se detectó en este frame.
+                # No explotamos, simplemente mantenemos la posesión del último equipo.
                 team_ball_control.append(team_ball_control[-1] if team_ball_control else None)
-        else:
-            # La pelota desapareció o no se detectó en este frame. 
-            # No explotamos, simplemente mantenemos la posesión del último equipo.
-            team_ball_control.append(team_ball_control[-1] if team_ball_control else None)
-        # --------------------------------------
+            # --------------------------------------
 
     # Print a quick summary to the console
     team1_num_frames = team_ball_control.count(1)
@@ -333,7 +346,8 @@ def main():
     else:
         home_poss, away_poss = 0, 0
 
-    exporter.export_json(tracks, json_output_path, home_possession=home_poss, away_possession=away_poss, view_transformer=view_transformer)
+    with timer.phase("Export JSON"):
+        exporter.export_json(tracks, json_output_path, home_possession=home_poss, away_possession=away_poss, view_transformer=view_transformer)
     print(f" 💾  Historical data saved to: {json_output_path}")
 
     # 10. Draw + save video — streaming frame-by-frame to avoid doubling RAM
@@ -341,25 +355,26 @@ def main():
     if config.SKIP_VIDEO_OUTPUT:
         print("⏭️  SKIP_VIDEO_OUTPUT=true — skipping annotated video render.")
     else:
-        print("🎨 Rendering annotated video (streaming)...")
-        h, w = video_frames[0].shape[:2]
-        fourcc = cv2.VideoWriter_fourcc(*config.VIDEO_CODEC)
-        writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+        with timer.phase("Render video"):
+            print("🎨 Rendering annotated video (streaming)...")
+            h, w = video_frames[0].shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*config.VIDEO_CODEC)
+            writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
-        team_ball_control_arr = np.array(team_ball_control)
-        total_frames = len(video_frames)
-        for frame_num, orig_frame in enumerate(video_frames):
-            frame = orig_frame.copy()
-            frame = tracker.draw_annotations_frame(frame, frame_num, tracks)
-            frame = camera_movement_estimator.draw_camera_movement_frame(frame, frame_num, camera_movement_per_frame)
-            frame = tracker.draw_team_ball_control(frame, frame_num, team_ball_control_arr)
-            frame = speed_and_distance_estimator.draw_speed_and_distance_frame(frame, frame_num, tracks)
-            writer.write(frame)
-            if frame_num % 500 == 0:
-                print(f"  ✍️  {frame_num}/{total_frames} frames rendered...")
+            team_ball_control_arr = np.array(team_ball_control)
+            total_frames = len(video_frames)
+            for frame_num, orig_frame in enumerate(video_frames):
+                frame = orig_frame.copy()
+                frame = tracker.draw_annotations_frame(frame, frame_num, tracks)
+                frame = camera_movement_estimator.draw_camera_movement_frame(frame, frame_num, camera_movement_per_frame)
+                frame = tracker.draw_team_ball_control(frame, frame_num, team_ball_control_arr)
+                frame = speed_and_distance_estimator.draw_speed_and_distance_frame(frame, frame_num, tracks)
+                writer.write(frame)
+                if frame_num % 500 == 0:
+                    print(f"  ✍️  {frame_num}/{total_frames} frames rendered...")
 
-        writer.release()
-        print(f"✅ Video saved to {output_path}")
+            writer.release()
+            print(f"✅ Video saved to {output_path}")
 
     # 11. Auto-deploy to demo folder
     print(" 🚀  Updating web demo...")
@@ -377,6 +392,10 @@ def main():
 
     print(f" ✅  Demo actualizada en la carpeta '{demo_dir}'")
     print(f"     JSON:  {demo_json_dest}")
+
+    # 12. Perf + sanity report — surfaces regressions when stacking optimisations.
+    timer.report()
+    run_sanity_checks(tracks, json_output_path)
 
 if __name__ == '__main__':
     main()

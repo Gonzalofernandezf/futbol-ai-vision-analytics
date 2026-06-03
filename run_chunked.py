@@ -22,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -249,6 +250,7 @@ def main():
     os.makedirs(chunks_dir, exist_ok=True)
 
     chunk_jsons = []
+    chunk_times = []  # wall-clock per chunk for the final summary
 
     for i, (cs, ce) in enumerate(chunks):
         tag      = f"chunk{i + 1:02d}"
@@ -264,11 +266,13 @@ def main():
         env["OUTPUT_DIR"]      = cdir
         env["DEMO_DIR"]        = demo_tmp  # suppress real-demo deploy during chunk runs
 
+        t0 = time.perf_counter()
         result = subprocess.run(
             [sys.executable, str(project_root / "Main.py")],
             env=env,
             cwd=str(project_root),
         )
+        chunk_times.append(time.perf_counter() - t0)
 
         if result.returncode != 0:
             print(f"❌ Main.py failed on {tag} (exit {result.returncode}). Aborting.")
@@ -317,6 +321,22 @@ def main():
     print(f"\n📁 Per-chunk files  → {chunks_dir}/")
     print(f"ℹ️  Chunk videos saved in {output_dir}/ with _chunk01, _chunk02 ... suffix")
     print(f"ℹ️  To concatenate: ffmpeg -f concat -safe 0 -i list.txt -c copy output.mp4")
+
+    # ── Run summary — quick sanity that all chunks completed in similar time ──
+    if chunk_times:
+        total_min  = sum(chunk_times) / 60
+        avg_min    = (sum(chunk_times) / len(chunk_times)) / 60
+        slowest_i  = int(np.argmax(chunk_times))
+        fastest_i  = int(np.argmin(chunk_times))
+        print("\n" + "═" * 60)
+        print("📊 RUN SUMMARY")
+        print("─" * 60)
+        print(f"  Total time           : {total_min:.1f} min")
+        print(f"  Chunks processed     : {len(chunk_times)} / {len(chunks)}")
+        print(f"  Per-chunk avg        : {avg_min:.2f} min")
+        print(f"  Slowest chunk        : {slowest_i + 1:02d} ({chunk_times[slowest_i]/60:.2f} min)")
+        print(f"  Fastest chunk        : {fastest_i + 1:02d} ({chunk_times[fastest_i]/60:.2f} min)")
+        print("═" * 60)
 
 
 if __name__ == "__main__":
