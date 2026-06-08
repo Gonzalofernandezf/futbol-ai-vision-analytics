@@ -1,5 +1,6 @@
 import json
 import numpy as np
+from analytics.match_analytics import compute_player_derived, compute_team_stats
 
 """
 Data Export Module
@@ -41,6 +42,7 @@ class GameStatsExporter:
     def export_json(self, tracks, output_path="match_data.json", home_possession=0, away_possession=0, view_transformer=None):
         # Final structure
         export_data = {
+            "schema_version": 2,
             "match_meta": {
                 "duration_seconds": 0,
                 "fps": self.fps,
@@ -199,6 +201,12 @@ class GameStatsExporter:
                 "speed_over_time": speed_over_time,
                 "position_history": stats["positions"]
             }
+
+        # ── MatchAnalytics v2: derived metrics + team aggregates ─────────────
+        duration = export_data["match_meta"]["duration_seconds"]
+        for pdata in export_data["players"].values():
+            pdata["derived"] = compute_player_derived(pdata, duration)
+        export_data["team_stats"] = compute_team_stats(export_data["players"])
 
         # Save file using the special encoder we defined above
         with open(output_path, 'w') as f:

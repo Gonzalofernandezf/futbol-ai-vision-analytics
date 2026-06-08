@@ -115,6 +115,19 @@ VIDEO_END_SEC      = float(_video_end_raw) if _video_end_raw is not None else No
 # 0.33 = YOLO-native width (~0.67 MB, fallback for <8 GB environments)
 FRAME_SCALE = float(os.getenv("FRAME_SCALE", "0.5"))
 
+# MatchAnalytics v2 — derived-metric thresholds
+SPRINT_THRESHOLD_KMH     = float(os.getenv("SPRINT_THRESHOLD_KMH",      "21.0"))
+HI_THRESHOLD_KMH         = float(os.getenv("HI_THRESHOLD_KMH",          "15.0"))
+HIGH_ACCEL_THRESHOLD_MS2 = float(os.getenv("HIGH_ACCEL_THRESHOLD_MS2",   "3.0"))
+PEAK_WINDOW_SEC          = int  (os.getenv("PEAK_WINDOW_SEC",            "300"))
+ANALYTICS_GRID_ROWS      = int  (os.getenv("ANALYTICS_GRID_ROWS",        "10"))
+ANALYTICS_GRID_COLS      = int  (os.getenv("ANALYTICS_GRID_COLS",        "10"))
+SPEED_ZONE_THRESHOLDS    = {
+    "walk":   float(os.getenv("SPEED_ZONE_WALK_KMH", "7.0")),
+    "jog":    float(os.getenv("SPEED_ZONE_JOG_KMH",  "15.0")),
+    "run":    float(os.getenv("SPEED_ZONE_RUN_KMH",   "21.0")),
+}
+
 # Skip annotated video output — set True on memory-constrained envs (Kaggle, CI).
 # JSON stats are always exported regardless of this flag.
 SKIP_VIDEO_OUTPUT = os.getenv("SKIP_VIDEO_OUTPUT", "false").lower() == "true"
