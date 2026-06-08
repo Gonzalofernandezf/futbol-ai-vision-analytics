@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from utils.video_utils import read_video, save_video
 from utils.perf_monitor import PhaseTimer, run_sanity_checks
 from Trackers.tracker import Tracker
+from ball_detection.ball_detector import BallDetector
 from team_assigner.team_assigner import TeamAssigner
 from datetime import datetime
 import cv2
@@ -98,15 +99,20 @@ def main():
     #    read video_frames read-only and write to disjoint state — safe to run
     #    in threads. YOLO + OpenCV release the GIL during heavy work.
     tracker = Tracker(model_path)
+    ball_detector = BallDetector(model_path=config.BALL_MODEL_PATH)
     view_transformer = ViewTransformer(model_path=config.MODELO_CANCHA_PATH)
     camera_movement_estimator = CameraMovementEstimator(video_frames[0])
 
     if config.PARALLEL_INFERENCE:
-        with timer.phase("Parallel inference (tracker+field+camera)"):
-            with ThreadPoolExecutor(max_workers=3) as ex:
+        with timer.phase("Parallel inference (tracker+ball+field+camera)"):
+            with ThreadPoolExecutor(max_workers=4) as ex:
                 f_tracks = ex.submit(
                     tracker.get_object_tracks,
                     video_frames, False, stub_path,
+                )
+                f_ball = ex.submit(
+                    ball_detector.get_ball_tracks,
+                    video_frames, False, config.BALL_STUB_PATH,
                 )
                 f_field = ex.submit(
                     view_transformer.calcular_matrices_para_video,
@@ -117,12 +123,17 @@ def main():
                     video_frames, False, 'stubs/camera_movement_stub.pkl',
                 )
                 tracks                    = f_tracks.result()
+                ball_tracks               = f_ball.result()
                 f_field.result()
                 camera_movement_per_frame = f_camera.result()
     else:
         with timer.phase("Tracker detect"):
             tracks = tracker.get_object_tracks(
                 video_frames, read_from_stub=False, stub_path=stub_path,
+            )
+        with timer.phase("Ball detect"):
+            ball_tracks = ball_detector.get_ball_tracks(
+                video_frames, read_from_stub=False, stub_path=config.BALL_STUB_PATH,
             )
         with timer.phase("Field keypoints"):
             view_transformer.calcular_matrices_para_video(video_frames)
@@ -131,6 +142,11 @@ def main():
                 video_frames, read_from_stub=False,
                 stub_path='stubs/camera_movement_stub.pkl',
             )
+
+    # Merge ball tracks (from the dedicated detector) into the main tracks dict.
+    # tracker.get_object_tracks left tracks["ball"] as a list of empty {} so
+    # downstream code that indexes by frame_num still works.
+    tracks["ball"] = ball_tracks
 
     # Ball interpolation
     print("⚽ Interpolating ball positions...")

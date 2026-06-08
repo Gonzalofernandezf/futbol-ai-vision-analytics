@@ -52,12 +52,14 @@ class Tracker:
         batch_size = _cfg.YOLO_BATCH_SIZE_TRACKER
         detections = []
         for i in range(0, len(frames), batch_size):
-            # 'iou' obliga a YOLO a borrar cajas que se solapen más de ese ratio.
-            # Esto elimina el "doble bbox" de raíz.
+            # NOTE: ball detection lives in ball_detection/BallDetector with its
+            # own weights and thresholds. This pass is dedicated to players,
+            # referees and goalkeepers — use the player-tuned conf/IoU.
             detections_batch = self.model.predict(
                 frames[i:i+batch_size],
-                conf=_cfg.YOLO_BALL_CONF,
-                iou=_cfg.YOLO_BALL_IOU,
+                conf=_cfg.YOLO_CONF,
+                iou=_cfg.YOLO_IOU,
+                imgsz=_cfg.YOLO_IMGSZ,
                 device=self.device,
                 half=_cfg.YOLO_HALF,
                 verbose=False,
@@ -75,44 +77,31 @@ class Tracker:
             return tracks
 
         # 2. Otherwise, we need to work: detect objects in frames
-        print("🔍 Detecting objects in video (this may take a while)...")
+        print("🔍 Detecting players/referees in video (this may take a while)...")
         detections = self.detect_frames(frames)
         tracks = {
-            "players": [],  # Sets of Bboxes per frame for players
-            "referees": [], # Sets of Bboxes per frame for referees
-            "ball": []      # Sets of Bboxes per frame for the ball
-        }
-
-        # Ball pipeline counters (logged once at the end of detection)
-        ball_stats = {
-            "accepted":   0,
-            "rej_conf":   0,
-            "rej_size":   0,   # too large OR too small
-            "rej_aspect": 0,
-            "rej_bounds": 0,   # crowd-mask (handled later by filter_ball_positions_by_speed for pitch bounds)
+            "players": [],   # per-frame {track_id: {bbox, position}}
+            "referees": [],  # per-frame {track_id: {bbox, position}}
+            "ball": [],      # populated by BallDetector in Main — kept here as an
+                             # empty placeholder so downstream code that iterates by
+                             # frame_num doesn't IndexError before the merge.
         }
 
         for frame_num, detection in enumerate(detections):
             cls_names = detection.names
-            cls_names_inv = {v:k for k,v in cls_names.items()}
+            cls_names_inv = {v: k for k, v in cls_names.items()}
 
             # Convert to supervision Detection format
             detection_supervision = sv.Detections.from_ultralytics(detection)
 
-            # --- FILTRO ANTI-FANTASMAS ---
-            # 1. Aplicamos NMS extra por si YOLO falló
-            # detection_supervision = detection_supervision.with_nms(threshold=0.5)
-            
-            # 2. Ignoramos todo lo que pase en el tercio superior de la pantalla (gradas)
-            # Asumiendo que y=0 es arriba. Ajusta CROWD_MASK_Y_PX en config si corta cabezas de jugadores.
+            # Crowd mask: drop detections whose top edge is above CROWD_MASK_Y_PX
+            # (stands / sky). Note: the ball detector applies the same gate
+            # independently, so this only affects players/referees here.
             mask = detection_supervision.xyxy[:, 1] > _cfg.CROWD_MASK_Y_PX
-            ball_class_id = cls_names_inv.get('ball')
-            if ball_class_id is not None:
-                rejected_balls = (~mask) & (detection_supervision.class_id == ball_class_id)
-                ball_stats["rej_bounds"] += int(rejected_balls.sum())
             detection_supervision = detection_supervision[mask]
 
-            # This prevents the tracker from getting confused if the label changes
+            # Remap goalkeeper → player so the tracker treats them as a single class
+            # (keeps IDs stable when a player moves between roles in the model output).
             for object_ind, class_id in enumerate(detection_supervision.class_id):
                 if cls_names[class_id] == "goalkeeper":
                     detection_supervision.class_id[object_ind] = cls_names_inv["player"]
@@ -121,86 +110,24 @@ class Tracker:
             detection_with_tracks = self.tracker.update_with_detections(detection_supervision)
             tracks["players"].append({})
             tracks["referees"].append({})
-            tracks["ball"].append({})
+            tracks["ball"].append({})  # placeholder, BallDetector fills this in
 
             for frame_detection in detection_with_tracks:
                 bbox = frame_detection[0].tolist()
                 cls_id = frame_detection[3]
                 track_id = frame_detection[4]
                 if cls_id == cls_names_inv['player']:
-                    # Calculate foot position (center-bottom)
-                    position = ( (bbox[0] + bbox[2])/2, bbox[3] )
+                    position = ((bbox[0] + bbox[2]) / 2, bbox[3])
                     tracks["players"][frame_num][track_id] = {
                         "bbox": bbox,
-                        "position": position 
-                        }
-                if cls_id == cls_names_inv['referee']:
-                    position = ( (bbox[0] + bbox[2])/2, bbox[3] )
+                        "position": position,
+                    }
+                elif 'referee' in cls_names_inv and cls_id == cls_names_inv['referee']:
+                    position = ((bbox[0] + bbox[2]) / 2, bbox[3])
                     tracks["referees"][frame_num][track_id] = {
                         "bbox": bbox,
-                        "position": position 
-                        }
-
-            # --- BALL DETECTION: pick best candidate per frame ---
-            # Problems with the naive loop:
-            #   1. Multiple "ball" detections (real ball + sock + pitch stain) all get
-            #      written to key 1, so the LAST one (lowest confidence, since YOLO sorts
-            #      desc) overwrites the real ball.
-            #   2. No geometry check → elongated sock boxes or large stain boxes pass.
-            #   3. No ball-specific confidence gate.
-            # Fix: collect all candidates, apply shape/confidence gates, keep best conf.
-            best_ball_conf = -1
-            best_ball_entry = None
-
-            for frame_detection in detection_supervision:
-                bbox = frame_detection[0].tolist()
-                cls_id = frame_detection[3]
-                conf  = float(frame_detection[2]) if frame_detection[2] is not None else 0.0
-
-                if cls_id != cls_names_inv['ball']:
-                    continue
-
-                # Gate 1: minimum confidence for ball
-                if conf < _cfg.BALL_MIN_CONF:
-                    ball_stats["rej_conf"] += 1
-                    continue
-
-                # Gate 2: size — ball cannot be large (socks, stains, heads are bigger)
-                # nor sub-pixel small (compression noise on grass)
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-                if (w > _cfg.BALL_MAX_BBOX_PX or h > _cfg.BALL_MAX_BBOX_PX or
-                    w < _cfg.BALL_MIN_BBOX_PX or h < _cfg.BALL_MIN_BBOX_PX):
-                    ball_stats["rej_size"] += 1
-                    continue
-
-                # Gate 3: shape — ball is roughly square; socks are tall, stains are flat
-                aspect = w / h if h > 0 else 999
-                if aspect < _cfg.BALL_MIN_ASPECT or aspect > _cfg.BALL_MAX_ASPECT:
-                    ball_stats["rej_aspect"] += 1
-                    continue
-
-                # Keep the highest-confidence detection that passed all gates
-                if conf > best_ball_conf:
-                    best_ball_conf = conf
-                    best_ball_entry = {
-                        "bbox": bbox,
-                        "position": ((bbox[0] + bbox[2]) / 2, bbox[3]),
-                        "confidence": conf,
+                        "position": position,
                     }
-
-            if best_ball_entry is not None:
-                tracks["ball"][frame_num][1] = best_ball_entry
-                ball_stats["accepted"] += 1
-
-        print(
-            "⚽ Ball pipeline: "
-            f"aceptados {ball_stats['accepted']}, "
-            f"rechazados por conf {ball_stats['rej_conf']}, "
-            f"por size {ball_stats['rej_size']}, "
-            f"por aspect {ball_stats['rej_aspect']}, "
-            f"por bounds {ball_stats['rej_bounds']}"
-        )
 
         if stub_path is not None:
             with open(stub_path, 'wb') as f:

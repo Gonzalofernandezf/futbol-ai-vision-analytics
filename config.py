@@ -14,7 +14,11 @@ PROJECT_ROOT = Path(__file__).parent
 VIDEO_PATH = os.getenv("VIDEO_PATH", "video_OG.mp4")
 MODEL_PATH = os.getenv("MODEL_PATH", "best_100e.pt")
 MODELO_CANCHA_PATH = os.getenv("MODELO_CANCHA_PATH", "modelo_cancha.pt")
+# Dedicated YOLO model for ball detection (trained separately, e.g. best_ball_v1.pt).
+# Lives next to MODEL_PATH in the project root by default.
+BALL_MODEL_PATH = os.getenv("BALL_MODEL_PATH", "best_ball_v1.pt")
 STUB_PATH = os.getenv("STUB_PATH", os.path.join(PROJECT_ROOT, "stubs", "track_stubs.pkl"))
+BALL_STUB_PATH = os.getenv("BALL_STUB_PATH", os.path.join(PROJECT_ROOT, "stubs", "ball_stub.pkl"))
 
 # Output directories
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", os.path.join(PROJECT_ROOT, "output_videos"))
@@ -40,10 +44,15 @@ YOLO_BATCH_SIZE_TRACKER = int(os.getenv("YOLO_BATCH_SIZE_TRACKER", "40"))
 YOLO_BATCH_SIZE_FIELD   = int(os.getenv("YOLO_BATCH_SIZE_FIELD",   "40"))
 
 # Per-model device override. Useful on multi-GPU hosts (Kaggle T4 x2):
-#   YOLO_DEVICE_TRACKER=cuda:0  YOLO_DEVICE_FIELD=cuda:1
+#   YOLO_DEVICE_TRACKER=cuda:0  YOLO_DEVICE_FIELD=cuda:1  BALL_DEVICE=cuda:1
 # Default: fall back to YOLO_DEVICE so single-GPU setups keep working.
 YOLO_DEVICE_TRACKER = os.getenv("YOLO_DEVICE_TRACKER", YOLO_DEVICE)
 YOLO_DEVICE_FIELD   = os.getenv("YOLO_DEVICE_FIELD",   YOLO_DEVICE)
+BALL_DEVICE         = os.getenv("BALL_DEVICE",         YOLO_DEVICE)
+
+# Ball detector batch size — model is small (YOLOv11m, ~40MB) so a larger batch
+# fits comfortably alongside the field model on the same GPU.
+BALL_BATCH_SIZE     = int(os.getenv("BALL_BATCH_SIZE", "40"))
 
 # Run tracker, field-keypoint detection and camera-movement optical flow in
 # parallel threads (they don't share state; YOLO + OpenCV release the GIL).
