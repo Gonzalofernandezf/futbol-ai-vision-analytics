@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from utils.video_utils import read_video, save_video
-from utils.perf_monitor import PhaseTimer, run_sanity_checks
+from utils.perf_monitor import PhaseTimer, run_sanity_checks, tracking_metrics
 from Trackers.tracker import Tracker
 from ball_detection.ball_detector import BallDetector
 from team_assigner.team_assigner import TeamAssigner
@@ -423,6 +423,16 @@ def main():
     # 12. Perf + sanity report — surfaces regressions when stacking optimisations.
     timer.report()
     run_sanity_checks(tracks, json_output_path)
+
+    metrics = tracking_metrics(tracks, fps)
+    print("📊 TRACKING METRICS")
+    print("─" * 55)
+    print(f"  {'unique player IDs':<26}: {metrics['num_unique_player_ids']}")
+    print(f"  {'long tracks (≥5s)':<26}: {metrics['num_long_tracks']}")
+    print(f"  {'avg track duration':<26}: {metrics['avg_track_duration_s']:.1f}s")
+    print(f"  {'id churn ratio':<26}: {metrics['id_churn_ratio']:.2f}  (target ≤3.0)")
+    print(f"  {'team flip rate':<26}: {metrics['team_flip_rate']*100:.1f}%  (target <2%)")
+    print("═" * 55)
 
 if __name__ == '__main__':
     main()

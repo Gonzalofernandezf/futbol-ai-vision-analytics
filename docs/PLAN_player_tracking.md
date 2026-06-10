@@ -203,6 +203,7 @@ T3.d — Rollout. Nuevo path MODEL_PATH configurable. Mantener best_100e.pt como
 Out of scope de este PR
 No tocar el modelo de balón (ya entrenado aparte).
 No tocar el modelo de campo.
+
 Tier 4 — Team assignment robusto (PR-T4)
 Objetivo: que los colores de equipo no fluctúen y no se cacheen para siempre.
 Esfuerzo: 3-5 días.

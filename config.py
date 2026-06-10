@@ -81,6 +81,14 @@ BALL_MAX_SPEED_MPS  = float(os.getenv("BALL_MAX_SPEED_MPS",  "40.0"))  # tuned f
 # YOLO inference thresholds for the ball pass (separate from the global YOLO_CONF/IOU)
 YOLO_BALL_CONF      = float(os.getenv("YOLO_BALL_CONF",      "0.35"))  # confidence floor for the YOLO ball pass
 YOLO_BALL_IOU       = float(os.getenv("YOLO_BALL_IOU",       "0.4"))   # NMS IoU for the YOLO ball pass
+YOLO_AGNOSTIC_NMS   = os.getenv("YOLO_AGNOSTIC_NMS", "true").lower() == "true"
+
+# ByteTrack parameters — exposed here so they can be tuned without touching tracker.py.
+# lost_track_buffer ~7s at 30fps (200 frames) keeps IDs through real occlusions in the area.
+# minimum_matching_threshold 0.7 is less strict than 0.8, helping lateral-camera footage.
+BYTETRACK_ACTIVATION      = float(os.getenv("BYTETRACK_ACTIVATION",      "0.25"))
+BYTETRACK_LOST_BUFFER     = int  (os.getenv("BYTETRACK_LOST_BUFFER",     "200"))
+BYTETRACK_MATCH_THRESHOLD = float(os.getenv("BYTETRACK_MATCH_THRESHOLD", "0.7"))
 
 # Crowd / stands mask: ignore detections whose top-Y is above this many pixels
 CROWD_MASK_Y_PX     = int  (os.getenv("CROWD_MASK_Y_PX",     "80"))

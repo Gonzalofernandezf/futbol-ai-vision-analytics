@@ -43,9 +43,9 @@ class Tracker:
         # We increase the buffer to 90 frames (approx 3-4 seconds) to keep IDs
         # even if the player is occluded or blurred for a while.
         self.tracker = sv.ByteTrack(
-            track_activation_threshold=0.25,
-            lost_track_buffer=100,
-            minimum_matching_threshold=0.8
+            track_activation_threshold=_cfg.BYTETRACK_ACTIVATION,
+            lost_track_buffer=_cfg.BYTETRACK_LOST_BUFFER,
+            minimum_matching_threshold=_cfg.BYTETRACK_MATCH_THRESHOLD,
         )
 
     def detect_frames(self, frames):

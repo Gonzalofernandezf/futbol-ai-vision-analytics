@@ -140,3 +140,38 @@ def run_sanity_checks(tracks, json_path):
         print(f"⚠️  {issues} sanity check(s) outside expected range — review output.")
     print("═" * 55)
     return issues
+
+
+def tracking_metrics(tracks, fps):
+    """Calcula métricas de tracking sobre tracks['players'].
+
+    Útil para comparar antes/después de cambios en ByteTrack o el detector:
+    un id_churn_ratio cercano a 1.0 indica que casi no hay IDs duplicados
+    por jugador real.
+
+    Args:
+        tracks (dict): Resultado de Tracker.get_object_tracks() (clave 'players').
+        fps (float): FPS del vídeo procesado.
+
+    Returns:
+        dict: Métricas de tracking listas para imprimir o comparar.
+    """
+    track_durations = {}   # {track_id: frame_count}
+    track_teams     = {}   # {track_id: [team_id, ...]}
+
+    for frame in tracks.get("players", []):
+        for tid, info in frame.items():
+            track_durations[tid] = track_durations.get(tid, 0) + 1
+            if "team" in info:
+                track_teams.setdefault(tid, []).append(info["team"])
+
+    long_tracks = [tid for tid, d in track_durations.items() if d >= fps * 5]
+    flips = sum(1 for teams in track_teams.values() if len(set(teams)) > 1)
+
+    return {
+        "num_unique_player_ids": len(track_durations),
+        "num_long_tracks":       len(long_tracks),
+        "avg_track_duration_s":  sum(track_durations.values()) / max(len(track_durations), 1) / fps,
+        "id_churn_ratio":        len(track_durations) / max(len(long_tracks), 1),
+        "team_flip_rate":        flips / max(len(track_teams), 1),
+    }
