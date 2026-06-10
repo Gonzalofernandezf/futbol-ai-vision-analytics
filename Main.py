@@ -377,6 +377,21 @@ def main():
         exporter.export_json(tracks, json_output_path, home_possession=home_poss, away_possession=away_poss, view_transformer=view_transformer)
     print(f" 💾  Historical data saved to: {json_output_path}")
 
+    # Dump the full tracks dict to pickle for post-hoc rendering.
+    # The JSON loses per-frame pixel bboxes (only stores metres), so an external
+    # renderer can only approximate overlay positions. The pickle keeps the
+    # exact bbox/team/team_color/has_ball state per frame — render_annotated_video.py
+    # uses it via --tracks-pkl to draw overlays exactly at the players' feet.
+    import pickle as _pickle
+    tracks_pkl_path = output_path.replace('.mp4', '_tracks.pkl')
+    with open(tracks_pkl_path, 'wb') as f:
+        _pickle.dump({
+            "tracks":             tracks,
+            "team_ball_control":  team_ball_control,
+            "fps":                fps,
+        }, f)
+    print(f" 💾  Tracks pickle saved to: {tracks_pkl_path}")
+
     # 10. Draw + save video — streaming frame-by-frame to avoid doubling RAM
     # (skip entirely with SKIP_VIDEO_OUTPUT=true for JSON-only runs)
     if config.SKIP_VIDEO_OUTPUT:

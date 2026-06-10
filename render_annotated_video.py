@@ -25,6 +25,7 @@ Usage
 
 import argparse
 import json
+import pickle
 import sys
 
 import cv2
@@ -177,12 +178,17 @@ def build_team_ball_control(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Re-render annotated football video from a pre-computed stats JSON"
+        description="Re-render annotated football video from a pre-computed stats JSON or tracks pickle"
     )
     parser.add_argument("--video",     required=True,
                         help="Path to the original (unannotated) video")
-    parser.add_argument("--json",      required=True,
-                        help="Path to combined_stats.json (or *_stats.json)")
+    parser.add_argument("--json",      default=None,
+                        help="Path to combined_stats.json (or *_stats.json). "
+                             "Used as fallback when --tracks-pkl is not given. "
+                             "Overlays will be approximate (back-projected from metres).")
+    parser.add_argument("--tracks-pkl", default=None,
+                        help="Path to *_tracks.pkl produced by Main.py. "
+                             "Preferred over --json: gives exact pixel-perfect overlays.")
     parser.add_argument("--output",    required=True,
                         help="Output path for the annotated video (.mp4)")
     parser.add_argument("--start-sec", type=float, default=0.0,
@@ -191,11 +197,35 @@ def main() -> None:
                         help="Clip end in seconds (default: full video)")
     args = parser.parse_args()
 
-    # ── load JSON ─────────────────────────────────────────────────────────────
-    data       = _load_json(args.json)
-    match_meta = data.get("match_meta", {})
-    players    = data.get("players",   {})
-    json_fps   = float(match_meta.get("fps", 25.0))
+    if args.tracks_pkl is None and args.json is None:
+        print("❌ Must pass either --tracks-pkl (preferred) or --json.", file=sys.stderr)
+        sys.exit(1)
+
+    # ── load source ──────────────────────────────────────────────────────────
+    # Two paths:
+    #   A. --tracks-pkl (preferred): exact bboxes, exact team colours, exact
+    #      ball positions, exact per-frame possession array. Pixel-perfect.
+    #   B. --json (fallback): back-projects metres → approximate pixels,
+    #      synthesises possession blocks from the overall %. Overlay positions
+    #      are close but not exact. Use only when the pickle is unavailable.
+    use_pickle = args.tracks_pkl is not None
+    if use_pickle:
+        with open(args.tracks_pkl, 'rb') as fh:
+            bundle = pickle.load(fh)
+        precomputed_tracks    = bundle["tracks"]
+        precomputed_tbc       = np.asarray(bundle["team_ball_control"])
+        json_fps              = float(bundle["fps"])
+        match_meta            = {}
+        players               = {}
+        print(f"📦 Using tracks pickle: {args.tracks_pkl}  (pixel-perfect mode)")
+    else:
+        data       = _load_json(args.json)
+        match_meta = data.get("match_meta", {})
+        players    = data.get("players",   {})
+        json_fps   = float(match_meta.get("fps", 25.0))
+        precomputed_tracks = None
+        precomputed_tbc    = None
+        print(f"📊 Using JSON (approximate mode): {args.json}")
 
     # ── open source video ─────────────────────────────────────────────────────
     cap = cv2.VideoCapture(args.video)
@@ -231,18 +261,42 @@ def main() -> None:
     print(f"💾 Output : {args.output}")
 
     # ── reconstruct tracks ────────────────────────────────────────────────────
-    tracks = build_tracks(
-        players_json     = players,
-        json_fps         = json_fps,
-        json_start_frame = json_start_frame,
-        clip_frames      = clip_frames,
-        frame_w          = frame_w,
-        frame_h          = frame_h,
-        pitch_length     = config.PITCH_LENGTH_M,
-        pitch_width      = config.PITCH_WIDTH_M,
-    )
+    if use_pickle:
+        # Slice the per-frame lists from the pickle to the requested clip window.
+        # Pickle frames are 0-indexed from the run that produced it (i.e. relative
+        # to that pipeline call's VIDEO_START_SEC), which matches the video frame
+        # ordering here as long as the caller passes the same video.
+        def _slice(lst):
+            return list(lst[json_start_frame:json_start_frame + clip_frames])
 
-    team_ball_control = build_team_ball_control(match_meta, clip_frames, video_fps)
+        tracks = {
+            "players":  _slice(precomputed_tracks.get("players",  [])),
+            "ball":     _slice(precomputed_tracks.get("ball",     [])),
+            "referees": _slice(precomputed_tracks.get("referees", [])),
+        }
+        # Pad short slices so the render loop doesn't IndexError on the last frames.
+        for key in ("players", "ball", "referees"):
+            while len(tracks[key]) < clip_frames:
+                tracks[key].append({})
+
+        team_ball_control = np.asarray(
+            precomputed_tbc[json_start_frame:json_start_frame + clip_frames]
+        )
+        if len(team_ball_control) < clip_frames:
+            pad = np.zeros(clip_frames - len(team_ball_control), dtype=int)
+            team_ball_control = np.concatenate([team_ball_control, pad])
+    else:
+        tracks = build_tracks(
+            players_json     = players,
+            json_fps         = json_fps,
+            json_start_frame = json_start_frame,
+            clip_frames      = clip_frames,
+            frame_w          = frame_w,
+            frame_h          = frame_h,
+            pitch_length     = config.PITCH_LENGTH_M,
+            pitch_width      = config.PITCH_WIDTH_M,
+        )
+        team_ball_control = build_team_ball_control(match_meta, clip_frames, video_fps)
 
     # ── drawing helpers — no YOLO or ByteTrack loaded ─────────────────────────
     # Tracker.__new__ skips __init__ (avoids loading YOLO weights).
