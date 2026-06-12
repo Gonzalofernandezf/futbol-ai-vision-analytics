@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\gafer\\\\Desktop\\\\Git\\\\futbol-ai-dashboard\" -MaxDepth 1 -File | Where-Object { $_.Name -match \"^\\(package\\\\.json|tsconfig|README|vite|app\\\\.\\)\" } | Select-Object Name, FullName)"
+    ]
+  }
+}
