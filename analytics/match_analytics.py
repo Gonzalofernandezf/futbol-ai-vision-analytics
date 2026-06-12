@@ -146,11 +146,17 @@ def compute_accelerations(
 def _half_stats(speeds: list) -> dict:
     valid = [v for v in speeds if v is not None]
     if not valid:
-        return {"distance_m": None, "avg_speed_kmh": None, "sprints": None}
+        return {
+            "distance_m": None,
+            "avg_speed_kmh": None,
+            "sprints": None,
+            "high_intensity_pct": None,
+        }
     return {
         "distance_m": round(sum(v / 3.6 for v in valid), 2),
         "avg_speed_kmh": round(sum(valid) / len(valid), 2),
         "sprints": compute_sprints(speeds)["count"],
+        "high_intensity_pct": compute_high_intensity_pct(speeds),
     }
 
 
@@ -163,11 +169,16 @@ def compute_halves(speed_over_time: list, duration_seconds: float) -> dict:
 
 
 def compute_drop_off(halves: dict) -> Optional[float]:
+    """Caída de velocidad media de la primera a la segunda mitad.
+
+    Positivo = el jugador bajó el ritmo en la segunda mitad (declive);
+    negativo = lo subió. Misma convención que el dashboard (insights.ts).
+    """
     avg1 = _get(halves, "first", "avg_speed_kmh")
     avg2 = _get(halves, "second", "avg_speed_kmh")
     if avg1 is None or avg2 is None or avg1 == 0:
         return None
-    return round((avg2 - avg1) / avg1 * 100, 2)
+    return round((avg1 - avg2) / avg1 * 100, 2)
 
 
 def compute_peak_window(
@@ -286,6 +297,40 @@ def compute_player_derived(player_data: dict, duration_seconds: float) -> dict:
         "peak_window": compute_peak_window(sot),
         "position": compute_position_metrics(ph),
     }
+
+
+def attach_player_percentiles(players_export: dict) -> None:
+    """Añade derived.percentiles a cada jugador del export.
+
+    Rank intra-equipo 0-100 por métrica: 100 * (#valores del equipo <= valor) / n,
+    la misma convención que usa el dashboard en PlayerRadar (pctRank).
+    Solo se exportan las métricas que consume el frontend (insights.ts):
+    sprints, high_intensity_pct y max_speed_kmh.
+    Muta players_export in place; jugadores sin valor para una métrica
+    simplemente no reciben esa clave.
+    """
+    metric_paths = {
+        "max_speed_kmh":      ("max_speed_kmh",),
+        "sprints":            ("derived", "sprints", "count"),
+        "high_intensity_pct": ("derived", "high_intensity_pct"),
+    }
+
+    teams: dict = {}
+    for pdata in players_export.values():
+        teams.setdefault(pdata.get("team"), []).append(pdata)
+
+    for members in teams.values():
+        for metric, path in metric_paths.items():
+            values = [v for v in (_get(p, *path) for p in members) if v is not None]
+            n = len(values)
+            if n == 0:
+                continue
+            for p in members:
+                v = _get(p, *path)
+                if v is None or not isinstance(p.get("derived"), dict):
+                    continue
+                pct = 100.0 * sum(1 for x in values if x <= v) / n
+                p["derived"].setdefault("percentiles", {})[metric] = round(pct, 1)
 
 
 # ── team aggregates ───────────────────────────────────────────────────────────
