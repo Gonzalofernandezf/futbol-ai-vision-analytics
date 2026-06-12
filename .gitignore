@@ -51,9 +51,13 @@ futbol-ai-dashboard/public/match_data.json
 futbol-ai-dashboard/public/demo_video.mp4
 futbol-ai-dashboard/public/eval_report.json
 futbol-ai-dashboard/public/eval_history.json
+futbol-ai-dashboard/public/processing_meta.json
 futbol-ai-dashboard/node_modules/
 futbol-ai-dashboard/dist/
 
+# Artefactos antiguos del dashboard — se mantienen en local pero nunca en git
+futbol-ai-dashboard/public/00.OLD/
+futbol-ai-dashboard/public/demo_video.json
 # Jupyter
 .ipynb_checkpoints/
 

@@ -10,6 +10,10 @@ from pathlib import Path
 # Project root
 PROJECT_ROOT = Path(__file__).parent
 
+# Versión del pipeline — mantener en sync con setup.py. Se reporta en
+# processing_meta.json para que el dashboard (/admin) identifique el run.
+PIPELINE_VERSION = "1.0.0"
+
 # File paths
 VIDEO_PATH = os.getenv("VIDEO_PATH", "video_OG.mp4")
 MODEL_PATH = os.getenv("MODEL_PATH", "best_100e.pt")

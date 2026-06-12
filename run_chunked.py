@@ -30,6 +30,7 @@ import cv2
 import numpy as np
 
 import config
+from utils.perf_monitor import export_processing_meta, run_sanity_checks
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
@@ -249,8 +250,9 @@ def main():
     chunks_dir   = os.path.join(output_dir, "_chunks")
     os.makedirs(chunks_dir, exist_ok=True)
 
-    chunk_jsons = []
-    chunk_times = []  # wall-clock per chunk for the final summary
+    chunk_jsons  = []
+    chunk_times  = []  # wall-clock per chunk for the final summary
+    phase_totals = {}  # suma de fases de todos los chunks (para processing_meta)
 
     for i, (cs, ce) in enumerate(chunks):
         tag      = f"chunk{i + 1:02d}"
@@ -296,6 +298,13 @@ def main():
         with open(json_path) as f:
             chunk_jsons.append(json.load(f))
 
+        # Acumular fases del chunk (Main.py deja processing_meta.json en su DEMO_DIR tmp)
+        chunk_meta_path = os.path.join(demo_tmp, "processing_meta.json")
+        if os.path.exists(chunk_meta_path):
+            with open(chunk_meta_path) as f:
+                for phase, secs in json.load(f)["timing"]["phases"].items():
+                    phase_totals[phase] = phase_totals.get(phase, 0.0) + secs
+
         print(f"   📊 Stats  → {json_path}")
 
     print(f"\n{'=' * 60}")
@@ -327,6 +336,15 @@ def main():
            os.path.normcase(os.path.abspath(eval_src)) != os.path.normcase(os.path.abspath(eval_dst)):
             shutil.copy(eval_src, eval_dst)
             print(f"   📈 Eval   → {eval_dst}")
+
+    # Metadata de procesamiento combinada para la ruta /admin del dashboard.
+    # Sanity checks sobre el JSON ya mergeado (sin tracks: esos checks se omiten).
+    sanity_checks = run_sanity_checks(None, combined_path)
+    export_processing_meta(
+        os.path.join(demo_dir, "processing_meta.json"),
+        phase_totals, sanity_checks, config.VIDEO_PATH,
+        chunk_seconds=chunk_times,
+    )
 
     print(f"\n📁 Per-chunk files  → {chunks_dir}/")
     print(f"ℹ️  Chunk videos saved in {output_dir}/ with _chunk01, _chunk02 ... suffix")

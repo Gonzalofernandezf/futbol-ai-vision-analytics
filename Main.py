@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from utils.video_utils import read_video, save_video
-from utils.perf_monitor import PhaseTimer, run_sanity_checks, tracking_metrics
+from utils.perf_monitor import PhaseTimer, run_sanity_checks, tracking_metrics, export_processing_meta
 from Trackers.tracker import Tracker
 from ball_detection.ball_detector import BallDetector
 from team_assigner.team_assigner import TeamAssigner
@@ -447,7 +447,13 @@ def main():
 
     # 12. Perf + sanity report — surfaces regressions when stacking optimisations.
     timer.report()
-    run_sanity_checks(tracks, json_output_path)
+    sanity_checks = run_sanity_checks(tracks, json_output_path)
+
+    # Metadata de procesamiento para la ruta /admin del dashboard
+    export_processing_meta(
+        os.path.join(demo_dir, 'processing_meta.json'),
+        timer.phases, sanity_checks, video_path,
+    )
 
     metrics = tracking_metrics(tracks, fps)
     print("📊 TRACKING METRICS")

@@ -91,10 +91,10 @@ pip install -e .
 TanStack Start/Router (file-based routing en `src/routes/`) + Vite 7 +
 Tailwind v4 + Recharts.
 
-- Se alimenta del pipeline Python vía la env `DEMO_DIR`: el pipeline copia
-  `match_data.json`, `demo_video.mp4` y (si existen) `eval_report.json` /
-  `eval_history.json` a `futbol-ai-dashboard/public/`, y el dashboard los
-  sirve como archivos estáticos (`fetch("/match_data.json")`, etc.).
+- Se alimenta del pipeline Python vía la env `DEMO_DIR`: el pipeline deposita
+  `match_data.json`, `demo_video.mp4`, `processing_meta.json` y (si existen)
+  `eval_report.json` / `eval_history.json` en `futbol-ai-dashboard/public/`,
+  y el dashboard los sirve como archivos estáticos (`fetch("/match_data.json")`, etc.).
 - Correr en local:
   ```bash
   cd futbol-ai-dashboard && bun install && bun dev
@@ -157,7 +157,8 @@ Tailwind v4 + Recharts.
 ├── futbol-ai-dashboard/            # Dashboard React/Vite — AUTOCONTENIDO
 │   ├── package.json / bun.lock     # Dependencias propias (bun)
 │   ├── public/                     # Artefactos de runtime del pipeline (ignorados en git):
-│   │                               #   match_data.json, demo_video.mp4, eval_*.json
+│   │                               #   match_data.json, demo_video.mp4, eval_*.json,
+│   │                               #   processing_meta.json
 │   └── src/                        # Código del dashboard (rutas, componentes, types)
 │
 ├── stubs/                          # Caché de tracking (ignorado en git)
