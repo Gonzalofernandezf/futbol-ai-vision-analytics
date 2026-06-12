@@ -22,7 +22,7 @@ Automated telemetry extraction from broadcast football footage using computer vi
 | **Vision** | OpenCV (Computer Vision library) |
 | **Data Processing** | NumPy, Pandas (Array/DataFrame operations) |
 | **ML** | scikit-learn (K-Means clustering for team colors) |
-| **Web Interface** | HTML5, Flask |
+| **Web Dashboard** | React 19 + TanStack Start + Vite + Tailwind v4 (in `futbol-ai-dashboard/`) |
 
 ## 📋 Installation
 
@@ -74,7 +74,16 @@ Processes the video through the pipeline:
 7. Output video + JSON statistics
 
 ### 3. View Results
-Open `demo_dashboard/index.html` in a browser to visualize the output video and match statistics.
+The pipeline auto-deploys `match_data.json` and `demo_video.mp4` (plus
+`eval_report.json` / `eval_history.json` when present) into
+`futbol-ai-dashboard/public/` (configurable via the `DEMO_DIR` env var).
+Then run the dashboard:
+
+```bash
+cd futbol-ai-dashboard
+bun install   # first time only
+bun dev
+```
 
 ## ⚙️ Configuration
 
@@ -151,6 +160,7 @@ Example JSON structure:
 ```
 futbol-ai-vision-analytics/
 ├── Main.py                          # Entry point - main analysis pipeline
+├── run_chunked.py                   # Chunked processing for long videos
 ├── config.py                        # Centralized configuration
 ├── requirements.txt                 # Python dependencies
 ├── calibrate_pitch/
@@ -173,9 +183,10 @@ futbol-ai-vision-analytics/
 │   └── data_exporter.py            # JSON export functionality
 ├── utils/
 │   └── video_utils.py              # Video I/O helpers
-└── demo_dashboard/
-    ├── index.html                  # Web visualization frontend
-    └── match_data.json             # Runtime statistics
+└── futbol-ai-dashboard/            # React/Vite dashboard (self-contained, bun)
+    ├── public/                     # Runtime artifacts deployed by the pipeline
+    │                               #   (match_data.json, demo_video.mp4, eval_*.json)
+    └── src/                        # Dashboard source (routes, components, types)
 
 ```
 

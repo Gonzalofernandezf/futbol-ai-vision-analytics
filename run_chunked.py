@@ -318,6 +318,16 @@ def main():
     shutil.copy(combined_path, demo_json_dst)
     print(f"🚀 Demo deployed → {demo_json_dst}")
 
+    # Artefactos de evaluación: copiar solo si existen (puede no haberse corrido
+    # eval_keypoints.py todavía) y si origen y destino no son el mismo archivo.
+    for eval_fname in ("eval_report.json", "eval_history.json"):
+        eval_src = os.path.join(config.EVAL_ARTIFACTS_DIR, eval_fname)
+        eval_dst = os.path.join(demo_dir, eval_fname)
+        if os.path.exists(eval_src) and \
+           os.path.normcase(os.path.abspath(eval_src)) != os.path.normcase(os.path.abspath(eval_dst)):
+            shutil.copy(eval_src, eval_dst)
+            print(f"   📈 Eval   → {eval_dst}")
+
     print(f"\n📁 Per-chunk files  → {chunks_dir}/")
     print(f"ℹ️  Chunk videos saved in {output_dir}/ with _chunk01, _chunk02 ... suffix")
     print(f"ℹ️  To concatenate: ffmpeg -f concat -safe 0 -i list.txt -c copy output.mp4")

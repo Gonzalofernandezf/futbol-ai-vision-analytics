@@ -46,11 +46,13 @@ output_videos/
 *.pt
 .env
 
-# Demo dashboard config
-demo_dashboard/match_data.json
-
-# Eval archives (full per-run reports, served locally, not committed)
-demo_dashboard/reports/
+# Dashboard (React/Vite) — artefactos de runtime generados por el pipeline + build
+futbol-ai-dashboard/public/match_data.json
+futbol-ai-dashboard/public/demo_video.mp4
+futbol-ai-dashboard/public/eval_report.json
+futbol-ai-dashboard/public/eval_history.json
+futbol-ai-dashboard/node_modules/
+futbol-ai-dashboard/dist/
 
 # Jupyter
 .ipynb_checkpoints/

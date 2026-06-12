@@ -22,7 +22,14 @@ BALL_STUB_PATH = os.getenv("BALL_STUB_PATH", os.path.join(PROJECT_ROOT, "stubs",
 
 # Output directories
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", os.path.join(PROJECT_ROOT, "output_videos"))
-DEMO_DIR = os.getenv("DEMO_DIR", os.path.join(PROJECT_ROOT, "demo_dashboard"))
+# Carpeta pública del dashboard React/Vite — el pipeline deposita aquí los
+# artefactos de runtime (match_data.json, demo_video.mp4, eval_*.json).
+DEMO_DIR = os.getenv("DEMO_DIR", os.path.join(PROJECT_ROOT, "futbol-ai-dashboard", "public"))
+
+# Artefactos de evaluación (eval/eval_keypoints.py escribe aquí por defecto).
+# El pipeline los copia condicionalmente a DEMO_DIR en el deploy — relevante
+# cuando DEMO_DIR apunta a otro sitio (p.ej. runs en Kaggle).
+EVAL_ARTIFACTS_DIR = os.getenv("EVAL_ARTIFACTS_DIR", os.path.join(PROJECT_ROOT, "futbol-ai-dashboard", "public"))
 
 # Ensure directories exist
 os.makedirs(OUTPUT_DIR, exist_ok=True)

@@ -432,6 +432,16 @@ def main():
         shutil.copy(output_path, demo_video_dest)
         print(f"     Video: {demo_video_dest}")
 
+    # Artefactos de evaluación: copiar solo si existen (puede no haberse corrido
+    # eval_keypoints.py todavía) y si origen y destino no son el mismo archivo.
+    for eval_fname in ('eval_report.json', 'eval_history.json'):
+        eval_src = os.path.join(config.EVAL_ARTIFACTS_DIR, eval_fname)
+        eval_dst = os.path.join(demo_dir, eval_fname)
+        if os.path.exists(eval_src) and \
+           os.path.normcase(os.path.abspath(eval_src)) != os.path.normcase(os.path.abspath(eval_dst)):
+            shutil.copy(eval_src, eval_dst)
+            print(f"     Eval:  {eval_dst}")
+
     print(f" ✅  Demo actualizada en la carpeta '{demo_dir}'")
     print(f"     JSON:  {demo_json_dest}")
 

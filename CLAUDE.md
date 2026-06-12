@@ -12,12 +12,13 @@ Plataforma de análisis de vídeo con IA para fútbol. El flujo actual es:
 1. El usuario graba un partido con cámara 1080p+ (idealmente desde tribuna, pero también en posición baja).
 2. Sube el vídeo a la plataforma.
 3. Se procesa a posteriori: detección de jugadores, equipos, balón, velocidad, distancia y aceleración.
-4. Los resultados se muestran en un dashboard HTML local servido en `localhost:5500`,
-   alimentado por `demo_dashboard/match_data.json` + `demo_dashboard/demo_video.mp4`.
+4. Los resultados se muestran en un dashboard React/Vite local (`futbol-ai-dashboard/`),
+   alimentado por `futbol-ai-dashboard/public/match_data.json` +
+   `futbol-ai-dashboard/public/demo_video.mp4` que el pipeline deposita ahí
+   automáticamente (carpeta configurable vía env `DEMO_DIR`).
 
 Entorno principal de desarrollo: Visual Studio Code + Claude Code.
-Servidor local: Live Server (extensión) sobre `demo_dashboard/index.html`, o
-`python -m http.server 5500` desde `demo_dashboard/`.
+Dashboard local: `cd futbol-ai-dashboard && bun install && bun dev`.
 
 ---
 
@@ -54,6 +55,13 @@ marca la hoja de ruta corta. Siguientes clientes serán otras academias formativ
 
 ## 3. Stack y estructura
 
+El repo tiene dos partes bien separadas: el **backend Python** (pipeline de visión)
+y el **dashboard React/Vite** (`futbol-ai-dashboard/`). Se comunican únicamente por
+archivos: el pipeline escribe sus artefactos en `DEMO_DIR` (por defecto
+`futbol-ai-dashboard/public/`) y el dashboard los lee como estáticos.
+
+### Backend (Python)
+
 **Lenguaje:** Python 3.9+
 
 **Frameworks de visión / ML:**
@@ -65,9 +73,7 @@ marca la hoja de ruta corta. Siguientes clientes serán otras academias formativ
 - `scikit-learn==1.3.0` — K-Means para clasificación de equipos por color de camiseta.
 - `numpy==1.24.3` / `pandas==2.0.3` — Procesado numérico y exportación de datos.
 - `python-dotenv==1.0.0` — Variables de entorno desde `.env`.
-- `Flask==3.0.0` — Incluido como dependencia pero **no activo**; el dashboard es HTML estático.
-
-**Frontend:** `demo_dashboard/index.html` — Tailwind CSS (CDN) + Chart.js.
+- `Flask==3.0.0` — Incluido como dependencia pero **no activo**; no hay backend HTTP.
 
 **Gestor de dependencias:** `pip` / `requirements.txt`. Instalar con:
 ```bash
@@ -78,11 +84,33 @@ Opcionalmente como paquete editable:
 pip install -e .
 ```
 
+### Dashboard (React/Vite)
+
+`futbol-ai-dashboard/` es **autocontenido**: tiene su propio `package.json` /
+`bun.lock`, su propio `.gitignore` y su propio README. Stack: React 19 +
+TanStack Start/Router (file-based routing en `src/routes/`) + Vite 7 +
+Tailwind v4 + Recharts.
+
+- Se alimenta del pipeline Python vía la env `DEMO_DIR`: el pipeline copia
+  `match_data.json`, `demo_video.mp4` y (si existen) `eval_report.json` /
+  `eval_history.json` a `futbol-ai-dashboard/public/`, y el dashboard los
+  sirve como archivos estáticos (`fetch("/match_data.json")`, etc.).
+- Correr en local:
+  ```bash
+  cd futbol-ai-dashboard && bun install && bun dev
+  ```
+- El contrato de datos está tipado en `futbol-ai-dashboard/src/types/match.ts`
+  (`MatchData`, schema v2 con `derived` y `team_stats`). Es el reflejo TypeScript
+  del JSON que produce `data_exporter/` + `analytics/`.
+- Los artefactos de runtime en `public/` (match_data, demo_video, eval_*) están
+  ignorados en git; solo se commitea el código del dashboard.
+
 **Estructura del repo:**
 
 ```
 /
 ├── Main.py                         # Orquestador principal: vídeo → JSON + vídeo anotado
+├── run_chunked.py                  # Procesado por chunks (vídeos largos) + merge de JSONs
 ├── config.py                       # ÚNICO lugar para parámetros (umbrales, FPS, rutas, etc.)
 ├── setup.py                        # Paquete + CLI entry point: `futbol-ai`
 ├── requirements.txt
@@ -116,15 +144,21 @@ pip install -e .
 │   └── camera_movement_estimator.py    # Compensación movimiento de cámara (optical flow)
 │
 ├── data_exporter/
-│   └── data_exporter.py            # Exporta tracking → JSON
+│   └── data_exporter.py            # Exporta tracking → JSON (schema v2)
+│
+├── analytics/                      # Métricas derivadas (sprints, zonas, percentiles)
+│
+├── eval/
+│   └── eval_keypoints.py           # Evaluación de keypoints de cancha vs GT Roboflow
 │
 ├── utils/
 │   └── video_utils.py              # Helpers de lectura/escritura de vídeo
 │
-├── demo_dashboard/
-│   ├── index.html                  # Dashboard interactivo (Tailwind + Chart.js)
-│   ├── demo_video.mp4              # Último vídeo procesado (runtime, ignorado en git)
-│   └── match_data.json             # Último JSON de estadísticas (runtime, ignorado en git)
+├── futbol-ai-dashboard/            # Dashboard React/Vite — AUTOCONTENIDO
+│   ├── package.json / bun.lock     # Dependencias propias (bun)
+│   ├── public/                     # Artefactos de runtime del pipeline (ignorados en git):
+│   │                               #   match_data.json, demo_video.mp4, eval_*.json
+│   └── src/                        # Código del dashboard (rutas, componentes, types)
 │
 ├── stubs/                          # Caché de tracking (ignorado en git)
 └── output_videos/                  # Salidas con fecha-versión (ignorado en git)
@@ -152,10 +186,14 @@ pip install -e .
 ```
 **Nunca cambiar este schema sin actualizar el dashboard en el mismo PR.**
 
-El schema crecerá: cuando se implementen los heatmaps (prioridad ALTA), habrá que añadir
-una serie de posiciones por frame por jugador (p. ej. `positions_over_time: [[x,y], ...]`).
-Cualquier extensión del schema requiere PR conjunto con el dashboard; no añadir campos
-al JSON sin que el frontend los consuma en ese mismo PR.
+El schema actual es **v2** (`schema_version: 2`): además de lo anterior, cada jugador
+incluye `position_history` (lista de `[x, y]` en metros o `null`, base de los heatmaps)
+y un bloque `derived` (sprints, zonas de velocidad, percentiles...), más `team_stats`
+a nivel partido. La referencia tipada completa vive en
+`futbol-ai-dashboard/src/types/match.ts`.
+Cualquier extensión del schema requiere PR conjunto: actualizar `data_exporter/` /
+`analytics/`, los types de `match.ts` y el componente que lo consuma en el mismo PR;
+no añadir campos al JSON sin que el frontend los consuma.
 
 ---
 
@@ -191,16 +229,18 @@ El vídeo de muestra disponible para pruebas locales es `video_OG.mp4`.
 
 **Lanzar el dashboard:**
 ```bash
-# Opción A: Live Server en VS Code (abre demo_dashboard/index.html)
-# Opción B:
-cd demo_dashboard && python -m http.server 5500
-# Luego abre http://localhost:5500
+cd futbol-ai-dashboard
+bun install   # solo la primera vez
+bun dev       # abre la URL que indique Vite en consola
 ```
+El dashboard lee `public/match_data.json` y `public/demo_video.mp4`; el pipeline
+(`Main.py` / `run_chunked.py`) los deposita ahí automáticamente al terminar
+(configurable con la env `DEMO_DIR`).
 
-**Tests:** No hay suite de tests automatizados todavía. Antes de un PR,
-la validación manual mínima es:
+**Tests:** El backend Python no tiene suite automatizada todavía; el dashboard
+tiene `bun test` (vitest). Antes de un PR, la validación manual mínima es:
 1. `python Main.py` con `video_OG.mp4` corre sin errores end-to-end.
-2. El dashboard carga en `localhost:5500` sin errores en la consola del navegador.
+2. El dashboard (`bun dev`) carga sin errores en la consola del navegador.
 3. El JSON generado tiene la estructura esperada (ver sección 3).
 
 **Linter / formato:** No hay configuración formal todavía. Usar criterio propio
@@ -250,5 +290,8 @@ con estilo PEP 8. Si se añade linting, hacerlo en un PR dedicado y actualizar a
   dashboard en el mismo PR.
 - No asumir que la cámara está en tribuna: el caso "cámara baja" es de primera clase.
 - No hardcodear parámetros fuera de `config.py`.
-- No activar Flask ni añadir un servidor backend sin discutirlo primero
-  (el dashboard es estático a propósito).
+- No activar Flask ni añadir un servidor backend Python sin discutirlo primero
+  (el dashboard se alimenta de archivos estáticos a propósito).
+- No tocar `futbol-ai-dashboard/src/` desde tareas de backend: el dashboard
+  tiene su propio scope. La integración pipeline ↔ dashboard es solo vía los
+  archivos de `DEMO_DIR`.

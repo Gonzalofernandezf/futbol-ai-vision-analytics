@@ -15,7 +15,7 @@ Uso:
     python eval/eval_keypoints.py
         --annotations ruta/coco_annotations.json
         --frames-dir  ruta/frames/
-        --output demo_dashboard/eval_report.json
+        --output futbol-ai-dashboard/public/eval_report.json
         --conf 0.25
         --pck-thresholds 5 10 20
 """
@@ -456,7 +456,7 @@ if __name__ == "__main__":
                         help="Ruta al JSON COCO Detection exportado desde Roboflow")
     parser.add_argument("--frames-dir",  required=True,
                         help="Carpeta con los frames JPG a evaluar")
-    parser.add_argument("--output", default="demo_dashboard/eval_report.json",
+    parser.add_argument("--output", default="futbol-ai-dashboard/public/eval_report.json",
                         help="Ruta del reporte JSON de salida")
     parser.add_argument("--conf", type=float, default=0.25,
                         help="Umbral de confianza del modelo (default: 0.25)")
