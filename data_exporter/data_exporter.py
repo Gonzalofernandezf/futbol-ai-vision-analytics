@@ -1,6 +1,10 @@
 import json
 import numpy as np
-from analytics.match_analytics import compute_player_derived, compute_team_stats
+from analytics.match_analytics import (
+    attach_player_percentiles,
+    compute_player_derived,
+    compute_team_stats,
+)
 
 """
 Data Export Module
@@ -206,6 +210,7 @@ class GameStatsExporter:
         duration = export_data["match_meta"]["duration_seconds"]
         for pdata in export_data["players"].values():
             pdata["derived"] = compute_player_derived(pdata, duration)
+        attach_player_percentiles(export_data["players"])
         export_data["team_stats"] = compute_team_stats(export_data["players"])
 
         # Save file using the special encoder we defined above

@@ -30,6 +30,11 @@ import cv2
 import numpy as np
 
 import config
+from analytics.match_analytics import (
+    attach_player_percentiles,
+    compute_player_derived,
+    compute_team_stats,
+)
 from utils.perf_monitor import export_processing_meta, run_sanity_checks
 
 
@@ -210,7 +215,16 @@ def _merge_chunks(chunk_jsons, overlaps):
 
     total_eff_dur = max(total_eff_dur, 0.001)
 
+    # Recalcular las analíticas v2 sobre los jugadores ya fusionados: los
+    # bloques `derived`/`team_stats` de cada chunk solo cubren ese chunk y
+    # no son válidos para el partido completo (mitades, peak_window,
+    # percentiles intra-equipo, etc.). Mismo contrato que data_exporter.
+    for pdata in global_players.values():
+        pdata["derived"] = compute_player_derived(pdata, total_eff_dur)
+    attach_player_percentiles(global_players)
+
     return {
+        "schema_version": 2,
         "match_meta": {
             "duration_seconds": round(total_eff_dur, 2),
             "fps":              fps,
@@ -218,6 +232,7 @@ def _merge_chunks(chunk_jsons, overlaps):
             "away_possession":  round(away_w / total_eff_dur, 1),
         },
         "players": global_players,
+        "team_stats": compute_team_stats(global_players),
     }
 
 

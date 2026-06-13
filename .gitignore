@@ -10,7 +10,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Anclado a la raíz: un `lib/` sin anclar ignoraba futbol-ai-dashboard/src/lib/
+/lib/
 lib64/
 parts/
 sdist/

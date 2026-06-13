@@ -4,7 +4,7 @@ import type { MatchData, Player, TeamStats } from "@/types/match";
 interface UseMatchDataResult {
   meta: MatchData["match_meta"] | null;
   players: Player[];
-  teamStats: Record<string, TeamStats> | null;
+  teamStats: Record<string, TeamStats | null> | null;
   schemaVersion: number;
   loading: boolean;
   error: string | null;

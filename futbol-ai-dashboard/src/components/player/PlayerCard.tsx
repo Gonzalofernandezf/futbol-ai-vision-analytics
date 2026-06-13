@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/team/StatusBadge";
 interface Props {
   player: Player;
   rangeMin: [number, number];
-  teamStats?: Record<string, TeamStats> | null;
+  teamStats?: Record<string, TeamStats | null> | null;
   /** Placeholder position label (not yet in JSON) */
   position?: string;
 }
