@@ -255,8 +255,14 @@ def main() -> None:
         cap.release()
         sys.exit(1)
 
-    # Frame index into position_history that corresponds to clip start
-    json_start_frame = int(args.start_sec * json_fps)
+    # Frame index into the source data that corresponds to clip start.
+    # - JSON mode: the JSON's position_history covers the FULL original video,
+    #   so we offset by start_sec.
+    # - Pickle mode: the pickle is LOCAL to its chunk (frame 0 of the pickle
+    #   corresponds to the chunk's VIDEO_START_SEC, not to second 0 of the
+    #   original video). We always slice the pickle from 0; --start-sec only
+    #   tells us where to seek the video file.
+    json_start_frame = 0 if use_pickle else int(args.start_sec * json_fps)
 
     print(f"📹 Video  : {args.video}  ({total_frames_video} frames @ {video_fps:.2f} fps)")
     print(f"📊 JSON   : {args.json}  (json_fps={json_fps})")
