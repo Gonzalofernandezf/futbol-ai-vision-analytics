@@ -1,134 +1,265 @@
-import type { Player, TeamStats } from "@/types/match";
+import type { Player, SpeedZones, TeamStats } from "@/types/match";
+
+export const SPRINT_KMH = 21;
+export const RUN_KMH = 15;
+export const JOG_KMH = 7;
+
+/** Count sprint events: each transition from sub-sprint into sprint zone = 1 sprint */
+export function countSprints(speeds: Array<number | null>): number {
+  let sprints = 0;
+  let inSprint = false;
+  for (const v of speeds) {
+    if (v === null) continue;
+    if (!inSprint && v >= SPRINT_KMH) {
+      sprints++;
+      inSprint = true;
+    } else if (inSprint && v < SPRINT_KMH) {
+      inSprint = false;
+    }
+  }
+  return sprints;
+}
+
+/** Distribution of non-null samples across walk / jog / run / sprint zones */
+export function computeSpeedZones(speeds: Array<number | null>): SpeedZones {
+  let walk = 0, jog = 0, run = 0, sprint = 0, total = 0;
+  for (const v of speeds) {
+    if (v === null) continue;
+    total++;
+    if (v < JOG_KMH) walk++;
+    else if (v < RUN_KMH) jog++;
+    else if (v < SPRINT_KMH) run++;
+    else sprint++;
+  }
+  if (total === 0) return { walk_pct: 0, jog_pct: 0, run_pct: 0, sprint_pct: 0 };
+  return {
+    walk_pct: (walk / total) * 100,
+    jog_pct: (jog / total) * 100,
+    run_pct: (run / total) * 100,
+    sprint_pct: (sprint / total) * 100,
+  };
+}
+
+/** Percentage of time in high-intensity zones (run + sprint) */
+export function computeHighIntensityPct(speeds: Array<number | null>): number {
+  const z = computeSpeedZones(speeds);
+  return z.run_pct + z.sprint_pct;
+}
+
+/**
+ * Performance drop-off from first to second half.
+ * Positive = intensity declined; negative = intensity increased second half.
+ */
+export function computeDropOff(firstHalfHIPct: number, secondHalfHIPct: number): number {
+  if (firstHalfHIPct === 0) return 0;
+  return ((firstHalfHIPct - secondHalfHIPct) / firstHalfHIPct) * 100;
+}
+
+/** Dominant field zone based on average Y coordinate of position history */
+export function dominantZone(positions: Array<[number, number] | null>): string {
+  let sy = 0, n = 0;
+  for (const p of positions) {
+    if (!p) continue;
+    sy += p[1];
+    n++;
+  }
+  if (n === 0) return "sin datos posicionales";
+  const cy = sy / n;
+  if (cy < 64 * 0.33) return "banda izquierda";
+  if (cy > 64 * 0.66) return "banda derecha";
+  return "zona central";
+}
+
+/** Slice speed_over_time to the minutes window [rangeMin[0], rangeMin[1]] */
+export function sliceSpeedByRange(
+  speeds: Array<number | null>,
+  rangeMin: [number, number],
+  totalMin: number,
+): Array<number | null> {
+  if (totalMin <= 0) return speeds;
+  const n = speeds.length;
+  const start = Math.floor((rangeMin[0] / totalMin) * n);
+  const end = Math.ceil((rangeMin[1] / totalMin) * n);
+  return speeds.slice(start, end);
+}
+
+export function isFullMatch(range: [number, number], totalMin: number): boolean {
+  return range[0] === 0 && Math.abs(range[1] - totalMin) <= 1;
+}
+
+export function isFirstHalf(range: [number, number], totalMin: number): boolean {
+  return range[0] === 0 && Math.abs(range[1] - totalMin / 2) <= 1;
+}
+
+export function isSecondHalf(range: [number, number], totalMin: number): boolean {
+  return Math.abs(range[0] - totalMin / 2) <= 1 && Math.abs(range[1] - totalMin) <= 1;
+}
 
 export interface InsightCandidate {
   key: string;
-  message: string;
   severity: "high" | "low";
+  message: string;
 }
 
-export function dominantZone(
-  positionHistory: Array<[number, number] | null>,
-): string {
-  const valid = positionHistory.filter(
-    (p): p is [number, number] => p !== null,
-  );
-  if (valid.length === 0) return "zona desconocida";
-
-  const avgX = valid.reduce((s, p) => s + p[0], 0) / valid.length;
-  const avgY = valid.reduce((s, p) => s + p[1], 0) / valid.length;
-
-  const xZone = avgX < 33 ? "defensiva" : avgX < 66 ? "central" : "ofensiva";
-  const yZone = avgY < 21 ? "banda izquierda" : avgY > 43 ? "banda derecha" : "centro";
-
-  if (xZone === "central" && yZone === "centro") return "zona central";
-  if (yZone === "centro") return `zona ${xZone}`;
-  return `${yZone} ${xZone}`;
+function toSeverity(percentile: number | null): "high" | "low" {
+  if (percentile === null) return "low";
+  return percentile >= 80 || percentile <= 20 ? "high" : "low";
 }
 
+/**
+ * Build the full list of insight candidates for a player.
+ * Uses precomputed `derived` fields when the active range matches a known period
+ * (full match / first half / second half); otherwise recalculates from raw data.
+ * Insights that depend on peak_window or drop_off are suppressed when
+ * missing_data_pct > 30 to avoid misleading conclusions.
+ */
 export function buildInsightCandidates(
   player: Player,
   teamStats: TeamStats | null,
-  timeRange: [number, number],
+  rangeMin: [number, number],
   matchDurationMin: number,
 ): InsightCandidate[] {
   const d = player.derived;
-  if (!d) return [];
-
   const candidates: InsightCandidate[] = [];
+  const teamLabel = `Equipo ${player.team}`;
+  const dataLimited = (d?.missing_data_pct ?? 0) > 30;
 
-  candidates.push({
-    key: "distance",
-    message: `Recorrió ${(player.total_distance_m / 1000).toFixed(1)} km en total.`,
-    severity: "low",
-  });
+  const usingPrecomputed =
+    d != null &&
+    (isFullMatch(rangeMin, matchDurationMin) ||
+      isFirstHalf(rangeMin, matchDurationMin) ||
+      isSecondHalf(rangeMin, matchDurationMin));
 
-  candidates.push({
-    key: "top_speed",
-    message: `Pico de velocidad: ${player.max_speed_kmh.toFixed(1)} km/h.`,
-    severity: "low",
-  });
+  let sprints: number;
+  let hiPct: number;
+  let zones: SpeedZones;
+  let dropOff: number | null = null;
 
-  candidates.push({
-    key: "zone",
-    message: `Zona predominante: ${dominantZone(player.position_history)}.`,
-    severity: "low",
-  });
+  if (usingPrecomputed && d) {
+    if (isFirstHalf(rangeMin, matchDurationMin) && d.halves) {
+      sprints = d.halves.first.sprints;
+      hiPct = d.halves.first.high_intensity_pct;
+      zones = computeSpeedZones(sliceSpeedByRange(player.speed_over_time, rangeMin, matchDurationMin));
+    } else if (isSecondHalf(rangeMin, matchDurationMin) && d.halves) {
+      sprints = d.halves.second.sprints;
+      hiPct = d.halves.second.high_intensity_pct;
+      zones = computeSpeedZones(sliceSpeedByRange(player.speed_over_time, rangeMin, matchDurationMin));
+    } else {
+      sprints = d.sprints;
+      hiPct = d.high_intensity_pct;
+      zones = d.speed_zones;
+      dropOff = d.drop_off_pct;
+    }
+  } else {
+    const sliced = sliceSpeedByRange(player.speed_over_time, rangeMin, matchDurationMin);
+    sprints = countSprints(sliced);
+    zones = computeSpeedZones(sliced);
+    hiPct = zones.run_pct + zones.sprint_pct;
+  }
 
-  if (d.sprints > 0) {
+  const pSprints = d?.percentiles?.sprints ?? null;
+  const pHI = d?.percentiles?.high_intensity_pct ?? null;
+  const pSpeed = d?.percentiles?.max_speed_kmh ?? null;
+
+  // --- Sprint candidate ---
+  if (teamStats?.leaders?.sprints === player.id) {
+    candidates.push({
+      key: "sprints_leader",
+      severity: "high",
+      message: `Top sprinter del ${teamLabel}: ${sprints} sprints${pSprints !== null ? `, p${Math.round(pSprints)} del plantel` : ""}.`,
+    });
+  } else if (pSprints !== null && pSprints <= 20) {
+    candidates.push({
+      key: "sprints_low",
+      severity: "high",
+      message: `Solo ${sprints} sprints, p${Math.round(pSprints)} del ${teamLabel}.`,
+    });
+  } else {
     candidates.push({
       key: "sprints",
-      message: `Realizó ${d.sprints} sprint${d.sprints !== 1 ? "s" : ""} durante el partido.`,
-      severity: d.sprints >= 5 ? "high" : "low",
+      severity: toSeverity(pSprints),
+      message: `${sprints} sprints en el período.`,
     });
   }
 
-  if (d.high_intensity_pct > 15) {
+  // --- High-intensity candidate ---
+  if (pHI !== null && pHI >= 80) {
     candidates.push({
-      key: "high_intensity",
-      message: `${d.high_intensity_pct.toFixed(0)}% del tiempo en alta intensidad.`,
+      key: "hi_top",
       severity: "high",
+      message: `Alta intensidad: ${hiPct.toFixed(0)}% del tiempo, top del ${teamLabel} (p${Math.round(pHI)}).`,
+    });
+  } else if (pHI !== null && pHI <= 20) {
+    candidates.push({
+      key: "hi_low",
+      severity: "high",
+      message: `Baja intensidad: ${hiPct.toFixed(0)}% en carrera/sprint (p${Math.round(pHI)} del ${teamLabel}).`,
+    });
+  } else {
+    candidates.push({
+      key: "hi",
+      severity: "low",
+      message: `${hiPct.toFixed(0)}% del tiempo en alta intensidad.`,
     });
   }
 
-  if (d.drop_off_pct > 20) {
+  // --- Drop-off candidate (full match, not limited data) ---
+  if (dropOff !== null && !dataLimited && Math.abs(dropOff) >= 15) {
     candidates.push({
       key: "drop_off",
-      message: `Caída de intensidad del ${d.drop_off_pct.toFixed(0)}% en el 2do tiempo.`,
       severity: "high",
+      message:
+        dropOff > 0
+          ? `Bajó un ${dropOff.toFixed(0)}% de intensidad en la segunda mitad.`
+          : `Intensificó su juego en la segunda mitad (+${Math.abs(dropOff).toFixed(0)}%).`,
     });
   }
 
-  if (d.peak_window) {
+  // --- Peak window candidate (full match, not limited data) ---
+  if (usingPrecomputed && isFullMatch(rangeMin, matchDurationMin) && d?.peak_window && !dataLimited) {
     candidates.push({
-      key: "peak",
-      message: `Pico de actividad entre min ${d.peak_window.start_min}–${d.peak_window.end_min} (${d.peak_window.avg_speed.toFixed(1)} km/h prom).`,
+      key: "peak_window",
       severity: "low",
+      message: `Mejor ventana: min ${d.peak_window.start_min}–${d.peak_window.end_min} (${d.peak_window.avg_speed.toFixed(1)} km/h prom).`,
     });
   }
 
-  if (d.speed_zones) {
-    if (d.speed_zones.sprint_pct > 5) {
-      candidates.push({
-        key: "sprint_pct",
-        message: `Pasó ${d.speed_zones.sprint_pct.toFixed(0)}% del tiempo en sprint.`,
-        severity: "high",
-      });
-    }
-    if (d.speed_zones.walk_pct > 60) {
-      candidates.push({
-        key: "walk_pct",
-        message: `Caminó el ${d.speed_zones.walk_pct.toFixed(0)}% del partido.`,
-        severity: "low",
-      });
-    }
-  }
-
-  const pctDist = d.percentiles?.total_distance_m;
-  if (pctDist !== undefined && pctDist >= 90) {
+  // --- Speed percentile (contextual, not repeating the raw number) ---
+  if (pSpeed !== null && pSpeed >= 80) {
     candidates.push({
-      key: "pctl_dist",
-      message: `Top ${(100 - pctDist).toFixed(0)}% en distancia recorrida de su equipo.`,
+      key: "speed_top",
       severity: "high",
+      message: `Uno de los más rápidos del ${teamLabel} (p${Math.round(pSpeed)} en vel. máxima).`,
+    });
+  } else if (pSpeed !== null && pSpeed <= 20) {
+    candidates.push({
+      key: "speed_low",
+      severity: "high",
+      message: `Velocidad máxima en p${Math.round(pSpeed)} del ${teamLabel}.`,
     });
   }
 
-  const pctSpeed = d.percentiles?.max_speed_kmh;
-  if (pctSpeed !== undefined && pctSpeed >= 90) {
-    candidates.push({
-      key: "pctl_speed",
-      message: `Top ${(100 - pctSpeed).toFixed(0)}% en velocidad máxima de su equipo.`,
-      severity: "high",
-    });
-  }
+  // --- Zone candidate (always available as low-severity fallback) ---
+  const n = player.position_history.length;
+  const posStart = matchDurationMin > 0 ? Math.floor((rangeMin[0] / matchDurationMin) * n) : 0;
+  const posEnd = matchDurationMin > 0 ? Math.ceil((rangeMin[1] / matchDurationMin) * n) : n;
+  const zone = dominantZone(player.position_history.slice(posStart, posEnd));
+  candidates.push({
+    key: "zone",
+    severity: "low",
+    message: `Actividad concentrada en ${zone}.`,
+  });
 
   return candidates;
 }
 
-export function selectTopInsights(
-  candidates: InsightCandidate[],
-): InsightCandidate[] {
+/**
+ * Pick the top n insights, always preferring high-severity over low-severity.
+ * Low-severity candidates fill the remaining slots when there aren't enough high ones.
+ */
+export function selectTopInsights(candidates: InsightCandidate[], n = 4): InsightCandidate[] {
   const high = candidates.filter((c) => c.severity === "high");
+  if (high.length >= n) return high.slice(0, n);
   const low = candidates.filter((c) => c.severity === "low");
-  const picked = [...high, ...low];
-  return picked.slice(0, 4);
+  return [...high, ...low].slice(0, n);
 }
