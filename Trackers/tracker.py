@@ -1,129 +1,125 @@
 from ultralytics import YOLO
-import supervision as sv
 import pickle
 import os
 import cv2
 import numpy as np
 import pandas as pd
+import yaml
+import tempfile
 
 import config as _cfg
 
-"""
-Object Tracking and Visualization Module
-
-Handles multi-object tracking across video frames using YOLOv8 detection and ByteTrack.
-Also manages drawing and annotation functions for visualization output.
-"""
-
 class Tracker:
-    """
-    Multi-object tracker for players and ball detection across video frames.
-    
-    Uses YOLOv8 for detection and ByteTrack for temporal association.
-    Provides caching to avoid recomputing detections on subsequent runs.
-    
-    Attributes:
-        model (YOLO): YOLOv8 detection model
-        tracker (ByteTrack): Multi-object tracker instance
-    """
-    
     def __init__(self, model_path):
-        """
-        Initialize tracker with YOLO model.
-
-        Args:
-            model_path (str): Path to YOLO model weights (e.g., 'best_100e.pt')
-        """
         self.device = _cfg.YOLO_DEVICE_TRACKER
         self.model = YOLO(model_path)
-        # Move weights to target device up-front so the first predict() call
-        # doesn't pay a cold-start cost (matters when running in a thread).
         if "cuda" in self.device:
             self.model.to(self.device)
-        # We increase the buffer to 90 frames (approx 3-4 seconds) to keep IDs
-        # even if the player is occluded or blurred for a while.
-        self.tracker = sv.ByteTrack(
-            track_activation_threshold=_cfg.BYTETRACK_ACTIVATION,
-            lost_track_buffer=_cfg.BYTETRACK_LOST_BUFFER,
-            minimum_matching_threshold=_cfg.BYTETRACK_MATCH_THRESHOLD,
-        )
+        self._botsort_yaml = self._build_botsort_yaml()
 
-    def detect_frames(self, frames):
+    def __del__(self):
+        try:
+            if hasattr(self, '_botsort_yaml') and os.path.exists(self._botsort_yaml):
+                os.unlink(self._botsort_yaml)
+        except Exception:
+            pass
+
+    def _build_botsort_yaml(self):
+        """Generate a BoT-SORT YAML from config.py env-overridable params."""
+        cfg = {
+            "tracker_type":     "botsort",
+            "track_high_thresh": _cfg.BOTSORT_TRACK_HIGH_THRESH,
+            "track_low_thresh":  _cfg.BOTSORT_TRACK_LOW_THRESH,
+            "new_track_thresh":  _cfg.BOTSORT_NEW_TRACK_THRESH,
+            "track_buffer":      _cfg.BOTSORT_TRACK_BUFFER,
+            "match_thresh":      _cfg.BOTSORT_MATCH_THRESH,
+            "gmc_method":        _cfg.BOTSORT_GMC_METHOD,
+            "proximity_thresh":  _cfg.BOTSORT_PROXIMITY_THRESH,
+            "appearance_thresh": _cfg.BOTSORT_APPEARANCE_THRESH,
+            "with_reid":         _cfg.BOTSORT_WITH_REID,
+            "model":             _cfg.BOTSORT_REID_MODEL,
+        }
+        fd, path = tempfile.mkstemp(suffix=".yaml", prefix="botsort_")
+        with os.fdopen(fd, "w") as f:
+            yaml.dump(cfg, f)
+        return path
+
+    def track_frames(self, frames):
+        """Run YOLO tracking with BoT-SORT + ReID across all frames."""
         batch_size = _cfg.YOLO_BATCH_SIZE_TRACKER
-        detections = []
+        results = []
         for i in range(0, len(frames), batch_size):
-            # NOTE: ball detection lives in ball_detection/BallDetector with its
-            # own weights and thresholds. This pass is dedicated to players,
-            # referees and goalkeepers — use the player-tuned conf/IoU.
-            detections_batch = self.model.predict(
-                frames[i:i+batch_size],
+            batch = frames[i:i + batch_size]
+            batch_results = self.model.track(
+                batch,
+                persist=True,
+                tracker=self._botsort_yaml,
                 conf=_cfg.YOLO_CONF,
                 iou=_cfg.YOLO_IOU,
                 imgsz=_cfg.YOLO_IMGSZ,
                 device=self.device,
                 half=_cfg.YOLO_HALF,
                 verbose=False,
+                agnostic_nms=_cfg.YOLO_AGNOSTIC_NMS,
             )
-            detections += detections_batch
-        return detections
+            results += batch_results
+        return results
 
     def get_object_tracks(self, frames, read_from_stub=False, stub_path=None):
-
-        # 1. If we already have saved data, read it and save time
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
             with open(stub_path, 'rb') as f:
                 tracks = pickle.load(f)
             print("✅ Data loaded from cache! (stub)")
             return tracks
 
-        # 2. Otherwise, we need to work: detect objects in frames
-        print("🔍 Detecting players/referees in video (this may take a while)...")
-        detections = self.detect_frames(frames)
+        print("🔍 Tracking players/referees with BoT-SORT + ReID...")
+        detections = self.track_frames(frames)
         tracks = {
-            "players": [],   # per-frame {track_id: {bbox, position}}
-            "referees": [],  # per-frame {track_id: {bbox, position}}
-            "ball": [],      # populated by BallDetector in Main — kept here as an
-                             # empty placeholder so downstream code that iterates by
-                             # frame_num doesn't IndexError before the merge.
+            "players": [],
+            "referees": [],
+            "ball": [],
         }
 
         for frame_num, detection in enumerate(detections):
             cls_names = detection.names
             cls_names_inv = {v: k for k, v in cls_names.items()}
 
-            # Convert to supervision Detection format
-            detection_supervision = sv.Detections.from_ultralytics(detection)
-
-            # Crowd mask: drop detections whose top edge is above CROWD_MASK_Y_PX
-            # (stands / sky). Note: the ball detector applies the same gate
-            # independently, so this only affects players/referees here.
-            mask = detection_supervision.xyxy[:, 1] > _cfg.CROWD_MASK_Y_PX
-            detection_supervision = detection_supervision[mask]
-
-            # Remap goalkeeper → player so the tracker treats them as a single class
-            # (keeps IDs stable when a player moves between roles in the model output).
-            for object_ind, class_id in enumerate(detection_supervision.class_id):
-                if cls_names[class_id] == "goalkeeper":
-                    detection_supervision.class_id[object_ind] = cls_names_inv["player"]
-
-            # Tracking
-            detection_with_tracks = self.tracker.update_with_detections(detection_supervision)
             tracks["players"].append({})
             tracks["referees"].append({})
-            tracks["ball"].append({})  # placeholder, BallDetector fills this in
+            tracks["ball"].append({})
 
-            for frame_detection in detection_with_tracks:
-                bbox = frame_detection[0].tolist()
-                cls_id = frame_detection[3]
-                track_id = frame_detection[4]
-                if cls_id == cls_names_inv['player']:
-                    position = ((bbox[0] + bbox[2]) / 2, bbox[3])
+            boxes = detection.boxes
+            if boxes is None or boxes.id is None:
+                continue
+
+            xyxy = boxes.xyxy.cpu().numpy()
+            cls_ids = boxes.cls.cpu().numpy().astype(int)
+            confs = boxes.conf.cpu().numpy()
+            track_ids = boxes.id.cpu().numpy().astype(int)
+
+            for idx in range(len(track_ids)):
+                bbox = xyxy[idx].tolist()
+
+                # Crowd mask
+                if bbox[1] <= _cfg.CROWD_MASK_Y_PX:
+                    continue
+
+                cls_id = cls_ids[idx]
+                track_id = int(track_ids[idx])
+                cls_name = cls_names.get(cls_id, "")
+
+                # Remap goalkeeper → player
+                if cls_name == "goalkeeper":
+                    cls_name = "player"
+
+                position = ((bbox[0] + bbox[2]) / 2, bbox[3])
+
+                if cls_name == "player":
                     tracks["players"][frame_num][track_id] = {
                         "bbox": bbox,
                         "position": position,
                     }
-                elif 'referee' in cls_names_inv and cls_id == cls_names_inv['referee']:
-                    position = ((bbox[0] + bbox[2]) / 2, bbox[3])
+                elif cls_name == "referee":
                     tracks["referees"][frame_num][track_id] = {
                         "bbox": bbox,
                         "position": position,

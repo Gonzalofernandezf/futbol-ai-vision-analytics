@@ -94,12 +94,24 @@ YOLO_BALL_CONF      = float(os.getenv("YOLO_BALL_CONF",      "0.35"))  # confide
 YOLO_BALL_IOU       = float(os.getenv("YOLO_BALL_IOU",       "0.4"))   # NMS IoU for the YOLO ball pass
 YOLO_AGNOSTIC_NMS   = os.getenv("YOLO_AGNOSTIC_NMS", "true").lower() == "true"
 
-# ByteTrack parameters — exposed here so they can be tuned without touching tracker.py.
-# lost_track_buffer ~7s at 30fps (200 frames) keeps IDs through real occlusions in the area.
-# minimum_matching_threshold 0.7 is less strict than 0.8, helping lateral-camera footage.
+# ByteTrack parameters — kept for reference / fallback; active tracker is now BoT-SORT.
 BYTETRACK_ACTIVATION      = float(os.getenv("BYTETRACK_ACTIVATION",      "0.25"))
 BYTETRACK_LOST_BUFFER     = int  (os.getenv("BYTETRACK_LOST_BUFFER",     "200"))
 BYTETRACK_MATCH_THRESHOLD = float(os.getenv("BYTETRACK_MATCH_THRESHOLD", "0.7"))
+
+# BoT-SORT + ReID parameters (Tier 1).
+# The YAML lives at Trackers/botsort.yaml; these env-vars override its values at
+# runtime so we can tune without editing the YAML.
+BOTSORT_TRACK_HIGH_THRESH = float(os.getenv("BOTSORT_TRACK_HIGH_THRESH", "0.5"))
+BOTSORT_TRACK_LOW_THRESH  = float(os.getenv("BOTSORT_TRACK_LOW_THRESH",  "0.1"))
+BOTSORT_NEW_TRACK_THRESH  = float(os.getenv("BOTSORT_NEW_TRACK_THRESH",  "0.6"))
+BOTSORT_TRACK_BUFFER      = int  (os.getenv("BOTSORT_TRACK_BUFFER",      "200"))
+BOTSORT_MATCH_THRESH      = float(os.getenv("BOTSORT_MATCH_THRESH",      "0.75"))
+BOTSORT_PROXIMITY_THRESH  = float(os.getenv("BOTSORT_PROXIMITY_THRESH",  "0.5"))
+BOTSORT_APPEARANCE_THRESH = float(os.getenv("BOTSORT_APPEARANCE_THRESH", "0.25"))
+BOTSORT_WITH_REID         = os.getenv("BOTSORT_WITH_REID", "true").lower() == "true"
+BOTSORT_GMC_METHOD        = os.getenv("BOTSORT_GMC_METHOD", "sparseOptFlow")
+BOTSORT_REID_MODEL        = os.getenv("BOTSORT_REID_MODEL", "auto")
 
 # Crowd / stands mask: ignore detections whose top-Y is above this many pixels
 CROWD_MASK_Y_PX     = int  (os.getenv("CROWD_MASK_Y_PX",     "80"))
