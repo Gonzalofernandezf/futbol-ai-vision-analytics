@@ -113,6 +113,30 @@ BOTSORT_WITH_REID         = os.getenv("BOTSORT_WITH_REID", "true").lower() == "t
 BOTSORT_GMC_METHOD        = os.getenv("BOTSORT_GMC_METHOD", "sparseOptFlow")
 BOTSORT_REID_MODEL        = os.getenv("BOTSORT_REID_MODEL", "auto")
 
+# ── Team assignment (Tier 4: robust jersey-colour clustering) ──────────────
+# Re-train the 2-team K-Means every N seconds so slow illumination / shadow
+# drift doesn't lock the teams to frame-0 lighting. <=0 disables re-clustering.
+TEAM_RECLUSTER_INTERVAL_SEC = float(os.getenv("TEAM_RECLUSTER_INTERVAL_SEC", "30"))
+
+# Grass (HSV) mask: pixels inside this hue range with enough saturation/value are
+# treated as pitch and dropped before extracting the jersey colour, so green
+# bleed from the bbox edges doesn't pull the cluster centroids towards grass.
+# OpenCV hue is 0-180; football grass sits roughly at 35-85.
+TEAM_GRASS_HUE_LOW   = int(os.getenv("TEAM_GRASS_HUE_LOW",   "35"))
+TEAM_GRASS_HUE_HIGH  = int(os.getenv("TEAM_GRASS_HUE_HIGH",  "85"))
+TEAM_GRASS_SAT_MIN   = int(os.getenv("TEAM_GRASS_SAT_MIN",   "40"))
+TEAM_GRASS_VAL_MIN   = int(os.getenv("TEAM_GRASS_VAL_MIN",   "40"))
+# If the grass mask would leave fewer than this fraction of the crop, the crop
+# is (almost) pure grass / heavily occluded — fall back to the unmasked crop
+# rather than trusting a handful of stray pixels.
+TEAM_MIN_JERSEY_PIXEL_FRAC = float(os.getenv("TEAM_MIN_JERSEY_PIXEL_FRAC", "0.10"))
+
+# Optional line/white removal. OFF by default: white & grey kits are common in
+# youth football and an aggressive white mask would erase that whole team.
+TEAM_MASK_WHITE      = os.getenv("TEAM_MASK_WHITE", "false").lower() == "true"
+TEAM_WHITE_SAT_MAX   = int(os.getenv("TEAM_WHITE_SAT_MAX",   "25"))
+TEAM_WHITE_VAL_MIN   = int(os.getenv("TEAM_WHITE_VAL_MIN",   "200"))
+
 # Crowd / stands mask: ignore detections whose top-Y is above this many pixels
 CROWD_MASK_Y_PX     = int  (os.getenv("CROWD_MASK_Y_PX",     "80"))
 

@@ -240,52 +240,38 @@ def main():
 
     # 7. Team logic
     team_assigner = TeamAssigner()
+    # Drives the periodic re-cluster cadence (every TEAM_RECLUSTER_INTERVAL_SEC).
+    team_assigner.fps = fps
 
     # Send the first frame containing players so it can 'learn' jersey colors
+    # (goalkeepers are skipped internally so they don't contaminate the clusters).
     team_assigner.assign_team_color(video_frames[0], tracks['players'][0])
 
     print("🧠 Assigning teams to each player...")
 
+    # Pass 1: build the per-track moving-vote histogram (with grass-masked colour
+    # and periodic re-clustering happening inside get_player_team).
     with timer.phase("Team assignment"):
         for frame_num, player_track in enumerate(tracks['players']):
             for player_id, track in player_track.items():
-                # Identify the team (1 or 2)
-                team = team_assigner.get_player_team(video_frames[frame_num], track['bbox'], player_id)
-
-                # Save the data in the tracks dictionary
-                tracks['players'][frame_num][player_id]['team'] = team
-                tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team]
+                team_assigner.get_player_team(
+                    video_frames[frame_num], track['bbox'], player_id,
+                    frame_num=frame_num, role=track.get('role', 'player'),
+                )
 
     print(f"🎨 Colors detected - Team 1: {team_assigner.team_colors[1]}, Team 2: {team_assigner.team_colors[2]}")
 
-    # 7.5 Team correction (VOTING)
-    # This prevents the color from flickering if the AI is confused in a single frame.
+    # 7.5 Finalise teams from the vote histogram (single source of truth).
+    # Locks one stable team per ID across every frame, so a single confused frame
+    # can never flip a player's team (keeps team_flip_rate ≈ 0).
     print("⚖️ Adjusting teams by majority voting...")
 
     with timer.phase("Team voting"):
-        player_team_votes = {} # Dictionary to save the votes: {player_id: [1, 1, 2, 1...]}
-
-        # 1. Collect all the "votes" from each frame
         for frame_num, player_track in enumerate(tracks['players']):
-            for player_id, track in player_track.items():
-                team = track['team']
-
-                if player_id not in player_team_votes:
-                    player_team_votes[player_id] = []
-
-                player_team_votes[player_id].append(team)
-
-        # 2. Count votes and correct the past
-        for player_id, votes in player_team_votes.items():
-            # Compute the MODE (the most frequent value)
-            # Example: If votes is [1, 1, 1, 2, 1], the winner is 1.
-            team_winner = max(set(votes), key=votes.count)
-
-            # 3. Overwrite the definitive team in ALL frames
-            for frame_num in range(len(tracks['players'])):
-                if player_id in tracks['players'][frame_num]:
-                    tracks['players'][frame_num][player_id]['team'] = team_winner
-                    tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team_winner]
+            for player_id in player_track:
+                team_winner = team_assigner.final_team(player_id)
+                tracks['players'][frame_num][player_id]['team'] = team_winner
+                tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team_winner]
 
     # 8. Assign Ball possession
     player_assigner = PlayerBallAssigner()

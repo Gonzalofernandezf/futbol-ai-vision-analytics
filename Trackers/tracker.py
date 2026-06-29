@@ -108,7 +108,11 @@ class Tracker:
                 track_id = int(track_ids[idx])
                 cls_name = cls_names.get(cls_id, "")
 
-                # Remap goalkeeper → player
+                # Goalkeepers are kept inside the "players" bucket (so they still
+                # get speed/distance and end up on the pitch), but we preserve the
+                # original class as `role` so TeamAssigner can treat them as a
+                # separate cluster instead of contaminating the 2-team K-Means.
+                role = cls_name
                 if cls_name == "goalkeeper":
                     cls_name = "player"
 
@@ -118,6 +122,7 @@ class Tracker:
                     tracks["players"][frame_num][track_id] = {
                         "bbox": bbox,
                         "position": position,
+                        "role": role,  # "player" | "goalkeeper"
                     }
                 elif cls_name == "referee":
                     tracks["referees"][frame_num][track_id] = {
