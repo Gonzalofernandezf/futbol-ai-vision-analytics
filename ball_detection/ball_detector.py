@@ -50,7 +50,7 @@ class BallDetector:
                 iou=_cfg.YOLO_BALL_IOU,
                 imgsz=_cfg.YOLO_IMGSZ,
                 device=self.device,
-                half=_cfg.YOLO_HALF,
+                quantize=_cfg.YOLO_HALF,
                 verbose=False,
             )
             detections += batch_results
