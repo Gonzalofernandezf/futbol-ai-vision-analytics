@@ -177,7 +177,7 @@ VIDEO_END_SEC      = float(_video_end_raw) if _video_end_raw is not None else No
 # Frame scaling — reduce RAM when loading video
 # 1.0 = original (~6 MB/frame at 1080p)   0.5 = half res (~1.5 MB, safe for 13 GB Kaggle + 4-min chunks)
 # 0.33 = YOLO-native width (~0.67 MB, fallback for <8 GB environments)
-FRAME_SCALE = float(os.getenv("FRAME_SCALE", "0.5"))
+FRAME_SCALE = float(os.getenv("FRAME_SCALE", "1"))
 
 # MatchAnalytics v2 — derived-metric thresholds
 SPRINT_THRESHOLD_KMH     = float(os.getenv("SPRINT_THRESHOLD_KMH",      "21.0"))
