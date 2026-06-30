@@ -38,6 +38,9 @@ class Tracker:
             "appearance_thresh": _cfg.BOTSORT_APPEARANCE_THRESH,
             "with_reid":         _cfg.BOTSORT_WITH_REID,
             "model":             _cfg.BOTSORT_REID_MODEL,
+            # Explicit defaults for fields added in newer ultralytics so our YAML
+            # is self-contained and doesn't depend on the runtime's default.yaml.
+            "fuse_score":        False,
         }
         fd, path = tempfile.mkstemp(suffix=".yaml", prefix="botsort_")
         with os.fdopen(fd, "w") as f:
