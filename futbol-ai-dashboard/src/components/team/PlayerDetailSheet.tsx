@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./StatusBadge";
 import { AvatarUploader } from "./AvatarUploader";
 import { SpeedChart } from "@/components/player/SpeedChart";
-import { PlayerRadar } from "@/components/player/PlayerRadar";
 import { daysUntil, getInitials } from "@/lib/playerEnrichment";
 import { useMatchData } from "@/hooks/useMatchData";
 import type { TeamPlayer } from "@/types/team";
@@ -114,12 +113,6 @@ export function PlayerDetailSheet({ player, open, onOpenChange, onEdit, onAvatar
                   speedOverTime={linked.speed_over_time}
                   rangeMin={[0, Math.max(1, Math.round(linked.speed_over_time.length / 60))]}
                 />
-              </div>
-              <div className="mt-3">
-                <div className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Perfil vs Equipo {player.team} (percentiles)
-                </div>
-                <PlayerRadar player={linked} teamPlayers={matchPlayers} />
               </div>
             </>
           ) : (

@@ -90,7 +90,7 @@ class ViewTransformer():
                 batch,
                 verbose=False,
                 device=self.device,
-                half=_cfg.YOLO_HALF,
+                quantize=_cfg.YOLO_HALF,
             )
 
             for offset, resultados_cancha in enumerate(batch_results):

@@ -58,7 +58,7 @@ class Tracker:
                 iou=_cfg.YOLO_IOU,
                 imgsz=_cfg.YOLO_IMGSZ,
                 device=self.device,
-                half=_cfg.YOLO_HALF,
+                quantize=_cfg.YOLO_HALF,
                 verbose=False,
                 agnostic_nms=_cfg.YOLO_AGNOSTIC_NMS,
             )
