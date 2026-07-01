@@ -1,33 +1,35 @@
 export interface EvalHistoryEntry {
   timestamp: string;
-  git_hash: string;
-  git_message: string;
-  git_date: string;
+  git_hash: string | null;
+  git_message: string | null;
+  git_date: string | null;
   model: string;
   conf_threshold: number;
   n_frames: number;
-  overall_pck_5px: number;
-  overall_pck_10px: number;
-  overall_pck_20px: number;
+  overall_recall: number | null;
+  overall_pck_5px: number | null;
+  overall_pck_10px: number | null;
+  overall_pck_20px: number | null;
   mean_error_px: number | null;
   mean_homography_error_m: number | null;
-  homography_failure_rate: number;
+  homography_failure_rate: number | null;
   mean_kps_detected_per_frame: number;
 }
 
 export interface EvalPerKeypoint {
-  n_gt_visible: number;
+  class_id: number;
+  n_gt: number;
   n_detected: number;
-  recall: number;
+  recall: number | null;
   mean_error_px: number | null;
-  pck_5px: number;
-  pck_10px: number;
-  pck_20px: number;
+  pck_5px: number | null;
+  pck_10px: number | null;
+  pck_20px: number | null;
 }
 
 export interface EvalPerFrame {
   filename: string;
-  n_gt_visible: number;
+  n_gt: number;
   n_detected: number;
   n_matched: number;
   mean_error_px: number | null;
@@ -50,12 +52,13 @@ export interface EvalReport {
     };
   };
   summary: {
-    overall_pck_5px: number;
-    overall_pck_10px: number;
-    overall_pck_20px: number;
+    overall_recall: number | null;
+    overall_pck_5px: number | null;
+    overall_pck_10px: number | null;
+    overall_pck_20px: number | null;
     mean_error_px: number | null;
     median_error_px: number | null;
-    homography_failure_rate: number;
+    homography_failure_rate: number | null;
     mean_homography_error_m: number | null;
     mean_kps_detected_per_frame: number;
     mean_kps_gt_per_frame: number;

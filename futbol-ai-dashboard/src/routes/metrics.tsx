@@ -110,21 +110,27 @@ function SummaryCards({ report }: { report: EvalReport }) {
   const cards = [
     {
       icon: <Target className="h-4 w-4" />,
+      label: "Recall global",
+      value: s.overall_recall == null ? "—" : pct(s.overall_recall),
+      tone: tonePct(s.overall_recall ?? 0, 0.5, 0.8),
+    },
+    {
+      icon: <Target className="h-4 w-4" />,
       label: "PCK @ 5 px",
-      value: pct(s.overall_pck_5px),
-      tone: tonePct(s.overall_pck_5px, 0.5, 0.8),
+      value: s.overall_pck_5px == null ? "—" : pct(s.overall_pck_5px),
+      tone: tonePct(s.overall_pck_5px ?? 0, 0.5, 0.8),
     },
     {
       icon: <Target className="h-4 w-4" />,
       label: "PCK @ 10 px",
-      value: pct(s.overall_pck_10px),
-      tone: tonePct(s.overall_pck_10px, 0.6, 0.85),
+      value: s.overall_pck_10px == null ? "—" : pct(s.overall_pck_10px),
+      tone: tonePct(s.overall_pck_10px ?? 0, 0.6, 0.85),
     },
     {
       icon: <Target className="h-4 w-4" />,
       label: "PCK @ 20 px",
-      value: pct(s.overall_pck_20px),
-      tone: tonePct(s.overall_pck_20px, 0.7, 0.9),
+      value: s.overall_pck_20px == null ? "—" : pct(s.overall_pck_20px),
+      tone: tonePct(s.overall_pck_20px ?? 0, 0.7, 0.9),
     },
     {
       icon: <Crosshair className="h-4 w-4" />,
@@ -183,9 +189,9 @@ function HistoryChart({ history }: { history: EvalHistoryEntry[] }) {
     .map((e) => ({
       t: e.timestamp.slice(5, 16).replace("T", " "),
       hash: e.git_hash,
-      pck5: e.overall_pck_5px * 100,
-      pck10: e.overall_pck_10px * 100,
-      pck20: e.overall_pck_20px * 100,
+      pck5: e.overall_pck_5px != null ? e.overall_pck_5px * 100 : null,
+      pck10: e.overall_pck_10px != null ? e.overall_pck_10px * 100 : null,
+      pck20: e.overall_pck_20px != null ? e.overall_pck_20px * 100 : null,
     }));
   return (
     <div className="h-64 w-full">
@@ -287,7 +293,7 @@ function PerKeypointChart({ report }: { report: EvalReport }) {
 
 function PerKeypointTable({ report }: { report: EvalReport }) {
   const rows = Object.entries(report.per_keypoint).sort(
-    (a, b) => b[1].recall - a[1].recall || b[1].pck_10px - a[1].pck_10px,
+    (a, b) => (b[1].recall ?? 0) - (a[1].recall ?? 0) || (b[1].pck_10px ?? 0) - (a[1].pck_10px ?? 0),
   );
   return (
     <div className="overflow-x-auto">
@@ -308,12 +314,12 @@ function PerKeypointTable({ report }: { report: EvalReport }) {
           {rows.map(([name, k]) => (
             <TableRow key={name}>
               <TableCell className="font-mono text-xs">{name}</TableCell>
-              <TableCell className="text-right">{k.n_gt_visible}</TableCell>
+              <TableCell className="text-right">{k.n_gt}</TableCell>
               <TableCell className="text-right">{k.n_detected}</TableCell>
-              <TableCell className="text-right">{pct(k.recall)}</TableCell>
-              <TableCell className="text-right">{pct(k.pck_5px)}</TableCell>
-              <TableCell className="text-right">{pct(k.pck_10px)}</TableCell>
-              <TableCell className="text-right">{pct(k.pck_20px)}</TableCell>
+              <TableCell className="text-right">{k.recall == null ? "—" : pct(k.recall)}</TableCell>
+              <TableCell className="text-right">{k.pck_5px == null ? "—" : pct(k.pck_5px)}</TableCell>
+              <TableCell className="text-right">{k.pck_10px == null ? "—" : pct(k.pck_10px)}</TableCell>
+              <TableCell className="text-right">{k.pck_20px == null ? "—" : pct(k.pck_20px)}</TableCell>
               <TableCell className="text-right">
                 {k.mean_error_px == null ? "—" : k.mean_error_px.toFixed(1)}
               </TableCell>

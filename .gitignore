@@ -42,6 +42,7 @@ env/
 *.pkl
 stubs/
 output_videos/
+eval/results/*.json
 *.mp4
 # Model weights – never commit, copy manually from training outputs
 *.pt
