@@ -89,38 +89,36 @@ N_CLASSES = len(KEYPOINT_NAMES)
 
 def load_coco_gt(coco_path: str):
     """
-    Lee JSON COCO Detection de Roboflow y devuelve:
+    Lee JSON COCO Keypoints de Roboflow y devuelve:
       gt_dict: {filename → {class_id: (cx_px, cy_px)}}
-      cat_id_to_class_id: {category_id_coco → class_id (0-21)}
+      cat_id_to_class_id: {} (no aplica en formato keypoints)
+
+    Formato esperado: cada anotación tiene un array `keypoints`
+    con tripletas [x, y, visibility, ...] donde el índice de posición
+    (0..21) corresponde al class_id de KEYPOINT_NAMES.
+    visibility=0 → punto no etiquetado (se omite).
     """
     with open(coco_path) as f:
         coco = json.load(f)
 
     id_to_filename = {img["id"]: img["file_name"] for img in coco["images"]}
-    id_to_wh = {img["id"]: (img["width"], img["height"]) for img in coco["images"]}
-
-    # Roboflow exporta categorías en orden alfabético — mapeamos por nombre
-    name_to_class_id = {name: i for i, name in enumerate(KEYPOINT_NAMES)}
-    cat_id_to_class_id = {}
-    for cat in coco["categories"]:
-        cid = name_to_class_id.get(cat["name"])
-        if cid is not None:
-            cat_id_to_class_id[cat["id"]] = cid
 
     gt_dict = {}
     for ann in coco["annotations"]:
-        fname = id_to_filename[ann["image_id"]]
-        cat_id = ann["category_id"]
-        if cat_id not in cat_id_to_class_id:
+        kps = ann.get("keypoints")
+        if not kps:
             continue
-        class_id = cat_id_to_class_id[cat_id]
-        x, y, w, h = ann["bbox"]  # COCO: top-left + w,h
-        cx, cy = x + w / 2, y + h / 2
-        if fname not in gt_dict:
-            gt_dict[fname] = {}
-        gt_dict[fname][class_id] = (cx, cy)
+        fname = id_to_filename[ann["image_id"]]
+        n_kps = len(kps) // 3
+        for i in range(min(n_kps, N_CLASSES)):
+            x, y, v = kps[i * 3], kps[i * 3 + 1], kps[i * 3 + 2]
+            if v == 0:
+                continue
+            if fname not in gt_dict:
+                gt_dict[fname] = {}
+            gt_dict[fname][i] = (float(x), float(y))
 
-    return gt_dict, cat_id_to_class_id
+    return gt_dict, {}
 
 
 def run_model(model, frame: np.ndarray, conf_threshold: float) -> dict:
