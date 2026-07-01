@@ -90,8 +90,9 @@ N_CLASSES = len(KEYPOINT_NAMES)
 def load_coco_gt(coco_path: str):
     """
     Lee JSON COCO Keypoints de Roboflow y devuelve:
-      gt_dict: {filename → {class_id: (cx_px, cy_px)}}
+      gt_dict: {filename → {class_id: (cx_px, cy_px)}}  (en la resolución del JSON, no la real)
       cat_id_to_class_id: {} (no aplica en formato keypoints)
+      fname_to_wh: {filename → (width, height)}  resolución con la que Roboflow anotó
 
     Formato esperado: cada anotación tiene un array `keypoints`
     con tripletas [x, y, visibility, ...] donde el índice de posición
@@ -102,6 +103,9 @@ def load_coco_gt(coco_path: str):
         coco = json.load(f)
 
     id_to_filename = {img["id"]: img["file_name"] for img in coco["images"]}
+    fname_to_wh = {
+        img["file_name"]: (img["width"], img["height"]) for img in coco["images"]
+    }
 
     gt_dict = {}
     for ann in coco["annotations"]:
@@ -118,7 +122,7 @@ def load_coco_gt(coco_path: str):
                 gt_dict[fname] = {}
             gt_dict[fname][i] = (float(x), float(y))
 
-    return gt_dict, {}
+    return gt_dict, {}, fname_to_wh
 
 
 def run_model(model, frame: np.ndarray, conf_threshold: float) -> dict:
@@ -288,7 +292,7 @@ def evaluate(coco_path: str, frames_dir: str, conf_threshold: float,
     print(f"Conf threshold:    {conf_threshold}")
     print(f"PCK thresholds:    {pck_thresholds} px\n")
 
-    gt_dict, _ = load_coco_gt(coco_path)
+    gt_dict, _, fname_to_wh = load_coco_gt(coco_path)
 
     kp_stats = {
         name: {
@@ -315,6 +319,21 @@ def evaluate(coco_path: str, frames_dir: str, conf_threshold: float,
         if frame is None:
             print(f"  [WARN] Error al leer: {img_path}")
             continue
+
+        # Las anotaciones de Roboflow están en la resolución con la que se
+        # subió el frame al proyecto, que puede diferir de la resolución real
+        # del JPG evaluado (p.ej. si Roboflow reescaló al importar). Sin este
+        # reescalado, un frame anotado a 640x640 y evaluado a 1920x1080 arroja
+        # errores en píxeles ~3x mayores de los reales.
+        ann_w, ann_h = fname_to_wh.get(fname, (frame.shape[1], frame.shape[0]))
+        frame_h, frame_w = frame.shape[:2]
+        scale_x = frame_w / ann_w
+        scale_y = frame_h / ann_h
+        if scale_x != 1.0 or scale_y != 1.0:
+            gt_pts = {
+                cls_id: (cx * scale_x, cy * scale_y)
+                for cls_id, (cx, cy) in gt_pts.items()
+            }
 
         pred_pts = run_model(model, frame, conf_threshold)
 
