@@ -34,6 +34,8 @@ class BallDetector:
         # call doesn't pay a cold-start cost (matters when running in a thread).
         if "cuda" in self.device:
             self.model.to(self.device)
+        if _cfg.YOLO_HALF and "cuda" in self.device:
+            self.model.model.half()
         print(
             f"⚽ Modelo balón: path={path}  device={self.device}  "
             f"clases={self.model.names}"
@@ -50,7 +52,6 @@ class BallDetector:
                 iou=_cfg.YOLO_BALL_IOU,
                 imgsz=_cfg.YOLO_IMGSZ,
                 device=self.device,
-                quantize=_cfg.YOLO_HALF,
                 verbose=False,
             )
             detections += batch_results

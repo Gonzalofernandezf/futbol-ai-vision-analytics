@@ -32,6 +32,8 @@ class ViewTransformer():
         # doesn't pay a cold-start cost (matters when running in a thread).
         if "cuda" in self.device:
             self.modelo_cancha.to(self.device)
+        if _cfg.YOLO_HALF and "cuda" in self.device:
+            self.modelo_cancha.model.half()
         print(f"🏟️  Modelo cancha: task={self.modelo_cancha.task}  device={self.device}  clases={self.modelo_cancha.names}")
 
         # Mapeo class_id → coordenadas reales (metros).
@@ -90,7 +92,6 @@ class ViewTransformer():
                 batch,
                 verbose=False,
                 device=self.device,
-                quantize=_cfg.YOLO_HALF,
             )
 
             for offset, resultados_cancha in enumerate(batch_results):

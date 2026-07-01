@@ -15,6 +15,8 @@ class Tracker:
         self.model = YOLO(model_path)
         if "cuda" in self.device:
             self.model.to(self.device)
+        if _cfg.YOLO_HALF and "cuda" in self.device:
+            self.model.model.half()
         self._botsort_yaml = self._build_botsort_yaml()
 
     def __del__(self):
@@ -61,7 +63,6 @@ class Tracker:
                 iou=_cfg.YOLO_IOU,
                 imgsz=_cfg.YOLO_IMGSZ,
                 device=self.device,
-                quantize=_cfg.YOLO_HALF,
                 verbose=False,
                 agnostic_nms=_cfg.YOLO_AGNOSTIC_NMS,
             )
