@@ -183,24 +183,26 @@ export function buildInsightCandidates(
   }
 
   // --- High-intensity candidate ---
-  if (pHI !== null && pHI >= 80) {
-    candidates.push({
-      key: "hi_top",
-      severity: "high",
-      message: `Alta intensidad: ${hiPct.toFixed(0)}% del tiempo, top del ${teamLabel} (p${Math.round(pHI)}).`,
-    });
-  } else if (pHI !== null && pHI <= 20) {
-    candidates.push({
-      key: "hi_low",
-      severity: "high",
-      message: `Baja intensidad: ${hiPct.toFixed(0)}% en carrera/sprint (p${Math.round(pHI)} del ${teamLabel}).`,
-    });
-  } else {
-    candidates.push({
-      key: "hi",
-      severity: "low",
-      message: `${hiPct.toFixed(0)}% del tiempo en alta intensidad.`,
-    });
+  if (hiPct != null) {
+    if (pHI !== null && pHI >= 80) {
+      candidates.push({
+        key: "hi_top",
+        severity: "high",
+        message: `Alta intensidad: ${hiPct.toFixed(0)}% del tiempo, top del ${teamLabel} (p${Math.round(pHI)}).`,
+      });
+    } else if (pHI !== null && pHI <= 20) {
+      candidates.push({
+        key: "hi_low",
+        severity: "high",
+        message: `Baja intensidad: ${hiPct.toFixed(0)}% en carrera/sprint (p${Math.round(pHI)} del ${teamLabel}).`,
+      });
+    } else {
+      candidates.push({
+        key: "hi",
+        severity: "low",
+        message: `${hiPct.toFixed(0)}% del tiempo en alta intensidad.`,
+      });
+    }
   }
 
   // --- Drop-off candidate (full match, not limited data) ---

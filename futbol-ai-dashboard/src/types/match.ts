@@ -17,13 +17,13 @@ export interface SpeedZones {
 export interface HalfDerived {
   distance_m: number;
   sprints: number;
-  high_intensity_pct: number;
+  high_intensity_pct: number | null;
 }
 
 export interface PlayerDerived {
   sprints: number;
   speed_zones: SpeedZones;
-  high_intensity_pct: number;
+  high_intensity_pct: number | null;
   halves: {
     first: HalfDerived;
     second: HalfDerived;
