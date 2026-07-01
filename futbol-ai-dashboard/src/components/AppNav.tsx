@@ -1,11 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { House, GitCompare, Activity, Users } from "lucide-react";
+import { House, GitCompare, Activity, Users, FlaskConical } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const items = [
   { to: "/", label: "Dashboard", Icon: House },
   { to: "/team", label: "Equipo", Icon: Users },
   { to: "/compare", label: "Comparar", Icon: GitCompare },
+  { to: "/metrics", label: "Métricas modelo", Icon: FlaskConical },
   { to: "/admin", label: "Admin", Icon: Activity },
 ] as const;
 
