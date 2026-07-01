@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import yaml
 import tempfile
+import torch
 
 import config as _cfg
 
@@ -67,6 +68,8 @@ class Tracker:
                 agnostic_nms=_cfg.YOLO_AGNOSTIC_NMS,
             )
             results += batch_results
+            if "cuda" in self.device:
+                torch.cuda.empty_cache()
         return results
 
     def get_object_tracks(self, frames, read_from_stub=False, stub_path=None):
