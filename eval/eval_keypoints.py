@@ -89,15 +89,17 @@ N_CLASSES = len(KEYPOINT_NAMES)
 
 def load_coco_gt(coco_path: str):
     """
-    Lee JSON COCO Keypoints de Roboflow y devuelve:
+    Lee JSON COCO Detection de Roboflow y devuelve:
       gt_dict: {filename → {class_id: (cx_px, cy_px)}}  (en la resolución del JSON, no la real)
-      cat_id_to_class_id: {} (no aplica en formato keypoints)
+      cat_id_to_class_id: {category_id_coco → class_id (0-21)}
       fname_to_wh: {filename → (width, height)}  resolución con la que Roboflow anotó
 
-    Formato esperado: cada anotación tiene un array `keypoints`
-    con tripletas [x, y, visibility, ...] donde el índice de posición
-    (0..21) corresponde al class_id de KEYPOINT_NAMES.
-    visibility=0 → punto no etiquetado (se omite).
+    Formato real de export de Roboflow para este proyecto: una anotación
+    (bbox) por punto de cancha, con una categoría por punto (22 categorías
+    con nombre + 1 supercategoría genérica "football-pitch-detection").
+    Mapeamos categoría → class_id por NOMBRE (no por índice posicional),
+    para no depender de que Roboflow numere las category_id en el mismo
+    orden que KEYPOINT_NAMES.
     """
     with open(coco_path) as f:
         coco = json.load(f)
@@ -107,22 +109,27 @@ def load_coco_gt(coco_path: str):
         img["file_name"]: (img["width"], img["height"]) for img in coco["images"]
     }
 
+    name_to_class_id = {name: i for i, name in enumerate(KEYPOINT_NAMES)}
+    cat_id_to_class_id = {}
+    for cat in coco["categories"]:
+        cid = name_to_class_id.get(cat["name"])
+        if cid is not None:
+            cat_id_to_class_id[cat["id"]] = cid
+
     gt_dict = {}
     for ann in coco["annotations"]:
-        kps = ann.get("keypoints")
-        if not kps:
+        cat_id = ann["category_id"]
+        if cat_id not in cat_id_to_class_id:
             continue
+        class_id = cat_id_to_class_id[cat_id]
         fname = id_to_filename[ann["image_id"]]
-        n_kps = len(kps) // 3
-        for i in range(min(n_kps, N_CLASSES)):
-            x, y, v = kps[i * 3], kps[i * 3 + 1], kps[i * 3 + 2]
-            if v == 0:
-                continue
-            if fname not in gt_dict:
-                gt_dict[fname] = {}
-            gt_dict[fname][i] = (float(x), float(y))
+        x, y, w, h = ann["bbox"]  # COCO: top-left + w,h
+        cx, cy = x + w / 2, y + h / 2
+        if fname not in gt_dict:
+            gt_dict[fname] = {}
+        gt_dict[fname][class_id] = (cx, cy)
 
-    return gt_dict, {}, fname_to_wh
+    return gt_dict, cat_id_to_class_id, fname_to_wh
 
 
 def run_model(model, frame: np.ndarray, conf_threshold: float) -> dict:
