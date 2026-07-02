@@ -37,17 +37,23 @@ export function SetPiecesCard({ setPieces }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
+    <div className="flex h-full min-h-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
         Balón parado
       </div>
 
-      <Tabs defaultValue="falta">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="falta" className="flex min-h-0 flex-1 flex-col">
+        {/* h-auto en vez de la h-9 fija del TabsList base: con icono + etiqueta en
+            dos líneas, 36px no alcanza y el contenido se desbordaba hacia abajo. */}
+        <TabsList className="grid h-auto w-full grid-cols-4 gap-1">
           {TYPES.map((type) => {
             const Icon = TYPE_CONFIG[type].icon;
             return (
-              <TabsTrigger key={type} value={type} className="flex-col gap-0.5 text-[11px]">
+              <TabsTrigger
+                key={type}
+                value={type}
+                className="flex-col gap-1 py-2 text-[11px] leading-none"
+              >
                 <Icon className="h-3.5 w-3.5" />
                 {TYPE_CONFIG[type].label}
               </TabsTrigger>
@@ -56,7 +62,7 @@ export function SetPiecesCard({ setPieces }: Props) {
         </TabsList>
 
         {TYPES.map((type) => (
-          <TabsContent key={type} value={type}>
+          <TabsContent key={type} value={type} className="flex min-h-0 flex-1 flex-col">
             <SetPieceList events={byType[type]} onSelect={(sec) => seekToMinute(sec / 60)} />
           </TabsContent>
         ))}
@@ -74,14 +80,14 @@ function SetPieceList({
 }) {
   if (events.length === 0) {
     return (
-      <p className="py-4 text-center text-xs text-muted-foreground">
+      <p className="flex flex-1 items-center justify-center text-center text-xs text-muted-foreground">
         Sin eventos detectados en este partido.
       </p>
     );
   }
 
   return (
-    <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+    <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
       {events.map((event, idx) => (
         <li key={`${event.type}-${event.frame_start}-${idx}`}>
           <button

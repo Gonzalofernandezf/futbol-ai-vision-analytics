@@ -65,24 +65,27 @@ function DashboardPage() {
     <div className="flex min-h-screen w-full">
       <DashboardSidebar players={players} />
 
-      <main className="grid min-w-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[1fr_350px]">
+      <main className="grid min-w-0 flex-1 grid-cols-1 items-stretch gap-4 p-4 xl:grid-cols-[280px_1fr_360px]">
+        {/* Balón parado: columna propia entre el listado de jugadores y el vídeo,
+            con toda la altura disponible para el listado (en vez de un recuadro
+            apretado bajo la tarjeta de jugador). */}
+        <div className="flex min-w-0 flex-col">
+          <SetPiecesCard setPieces={setPieces} />
+        </div>
+
         <section className="flex min-w-0 flex-col gap-4">
           <MatchHeader meta={meta} />
-          {/* Mapa de calor y vídeo en paralelo (mitad cada uno) para tenerlo todo
-              en un solo vistazo, en vez de uno debajo del otro. */}
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-            {selected ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Mapa de calor · Jugador #{selected.id}
-                </div>
-                <Heatmap positions={filteredPositions} />
+          <VideoPlayer meta={meta} />
+          {selected ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Mapa de calor · Jugador #{selected.id}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Selecciona un jugador</p>
-            )}
-            <VideoPlayer meta={meta} />
-          </div>
+              <Heatmap positions={filteredPositions} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Selecciona un jugador</p>
+          )}
         </section>
 
         <aside className="flex flex-col gap-4">
@@ -91,7 +94,6 @@ function DashboardPage() {
           ) : (
             <p className="text-sm text-muted-foreground">Selecciona un jugador</p>
           )}
-          <SetPiecesCard setPieces={setPieces} />
         </aside>
       </main>
     </div>
