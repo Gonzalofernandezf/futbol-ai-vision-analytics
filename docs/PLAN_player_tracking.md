@@ -17,7 +17,7 @@
 | — | Reentrenamiento `modelo_cancha.pt` | ✅ Completo (PCK@5px 93%, error homografía 5.5m) |
 | — | Heatmaps precisos por jugador | ✅ Completo (desbloqueado por nuevo modelo_cancha) |
 | T2 | Cross-chunk ReID | 🔲 Pendiente |
-| T3 | Reentrenamiento `best_100e.pt` (cámara baja) | 🔲 Pendiente |
+| T3 | Reentrenamiento `best_100e.pt` (cámara baja) | 🟡 `best_jugadores_v2.pt` validado en footage genérico (mAP50 0.983, id_churn 3.24→2.46); pendiente validar con cámara real de Dinamó |
 | — | Análisis de balón parado | 🔲 Pendiente |
 
 ---
@@ -167,14 +167,14 @@ Script listo en `datasets/train_jugadores.py`. Parámetros objetivo:
 - Ejecutar en Kaggle con GPU.
 
 **T3.c — Validación**
-- mAP50 ≥ 0.85 en el holdout de validación del dataset.
-- Correr `Main.py` con `video_OG.mp4` y comparar visualmente recall en momentos con jugadores pequeños/ocluidos.
-- Grabar 2-3 minutos con la cámara de Dinamó (3-4m de altura) y validar antes de la próxima reunión con el cliente.
+- ✅ mAP50 = 0.983 en el holdout del dataset fusionado (objetivo ≥0.85). Por clase vs. `best_100e.pt` (mismo holdout, normalizado sin balón): `goalkeeper` +2.1pts mAP50 / +6.0pts mAP50-95 (mejora real), `player`/`referee` prácticamente planos (ya estaban cerca del techo). Ver comparación completa en el hilo de la sesión que hizo el entrenamiento.
+- ✅ Comparación con `debug_player_detection.py` (script nuevo, más liviano que `Main.py` — corre solo tracker+equipos, sin balón/campo/velocidad) sobre 30s de `video_OG.mp4`: `id_churn_ratio` 3.24→2.46 (pasa de incumplir el objetivo ≤3.0 a cumplirlo), long tracks (≥5s) 21→24, avg track duration 5.4s→6.0s. Inspección visual lado a lado: sin diferencias apreciables a simple vista, consistente con que la mejora real es modesta (concentrada en `goalkeeper`).
+- 🔲 **Pendiente:** grabar 2-3 minutos con la cámara real de Dinamó (3-4m de altura) y validar ahí — es la única prueba que mide directamente el objetivo de este Tier (cámara baja). Los resultados de arriba son sobre footage de cámara tribuna/lateral genérica, no cámara baja real.
 
 **T3.d — Rollout**
-- Nuevo modelo como `best_jugadores_v2.pt` en la raíz del repo (no sobreescribir `best_100e.pt`).
-- Apuntar con `MODEL_PATH` en `.env` al nuevo fichero.
-- Mantener `best_100e.pt` como fallback durante 1-2 semanas.
+- ✅ `best_jugadores_v2.pt` (YOLOv11m) es el candidato — colocar en la raíz del repo (no sobreescribe `best_100e.pt`; `*.pt` sigue en `.gitignore`, no se commitea).
+- Apuntar con `MODEL_PATH=best_jugadores_v2.pt` en `.env` (local y Kaggle) para usarlo. `config.py`/`.env.example` mantienen `best_100e.pt` como default — el cambio es opt-in por entorno, no global.
+- Mantener `best_100e.pt` como fallback hasta validar con footage real de Dinamó (T3.c pendiente arriba).
 
 **Esfuerzo:** 1-2 días de setup + tiempo de entrenamiento en Kaggle (~2-4h de GPU).
 **Riesgo:** bajo-medio. Los scripts ya están listos; el riesgo es que los datasets de Roboflow no cubran suficientemente bien el ángulo específico de Dinamó — en ese caso, segunda iteración con datos propios.
