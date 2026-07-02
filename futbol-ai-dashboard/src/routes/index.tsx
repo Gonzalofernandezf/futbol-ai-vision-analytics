@@ -7,6 +7,7 @@ import { MatchHeader } from "@/components/dashboard/MatchHeader";
 import { Heatmap } from "@/components/dashboard/Heatmap";
 import { VideoPlayer } from "@/components/dashboard/VideoPlayer";
 import { PlayerCard } from "@/components/player/PlayerCard";
+import { SetPiecesCard } from "@/components/player/SetPiecesCard";
 import { LoadingSkeleton, ErrorPanel } from "@/components/LoadingSkeleton";
 
 export const Route = createFileRoute("/")({
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/")({
 });
 
 function DashboardPage() {
-  const { meta, players, teamStats, loading, error } = useMatchData();
+  const { meta, players, teamStats, setPieces, loading, error } = useMatchData();
   const {
     selectedPlayerId,
     setSelectedPlayerId,
@@ -67,25 +68,30 @@ function DashboardPage() {
       <main className="grid min-w-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[1fr_350px]">
         <section className="flex min-w-0 flex-col gap-4">
           <MatchHeader meta={meta} />
-          {selected ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Mapa de calor · Jugador #{selected.id}
+          {/* Mapa de calor y vídeo en paralelo (mitad cada uno) para tenerlo todo
+              en un solo vistazo, en vez de uno debajo del otro. */}
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+            {selected ? (
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Mapa de calor · Jugador #{selected.id}
+                </div>
+                <Heatmap positions={filteredPositions} />
               </div>
-              <Heatmap positions={filteredPositions} />
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Selecciona un jugador</p>
-          )}
-          <VideoPlayer meta={meta} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Selecciona un jugador</p>
+            )}
+            <VideoPlayer meta={meta} />
+          </div>
         </section>
 
-        <aside className="flex flex-col">
+        <aside className="flex flex-col gap-4">
           {selected ? (
             <PlayerCard player={selected} rangeMin={timeRange} teamStats={teamStats} />
           ) : (
             <p className="text-sm text-muted-foreground">Selecciona un jugador</p>
           )}
+          <SetPiecesCard setPieces={setPieces} />
         </aside>
       </main>
     </div>

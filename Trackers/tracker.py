@@ -339,7 +339,12 @@ class Tracker:
             pitch_margin (float): Tolerance beyond pitch edge before discarding (default 5 m).
 
         Returns:
-            list[dict]: Filtered ball_tracks.
+            tuple[list[dict], list[tuple[int, list[float]]]]: Filtered ball_tracks,
+            and out_of_bounds_events — the (frame_num, position_m) pairs rejected
+            specifically by the Stage A pitch-bounds guard (as opposed to Stage B
+            speed-reject or a plain missed detection). This is the raw signal
+            analytics/set_piece_detector.py uses to tell "ball left the pitch"
+            (corner/throw-in/goal-kick) apart from ordinary occlusion gaps.
         """
         max_dist_per_frame = max_speed_mps / fps
         x_min = -pitch_margin
@@ -349,7 +354,7 @@ class Tracker:
 
         last_valid_frame = None
         last_valid_pos   = None
-        removed_bounds   = 0
+        out_of_bounds_events = []
         removed_speed    = 0
 
         for frame_num, frame_ball in enumerate(ball_tracks):
@@ -367,7 +372,7 @@ class Tracker:
             px, py = pos[0], pos[1]
             if not (x_min <= px <= x_max and y_min <= py <= y_max):
                 ball_tracks[frame_num] = {}
-                removed_bounds += 1
+                out_of_bounds_events.append((frame_num, [float(px), float(py)]))
                 continue
 
             # --- Stage B: speed plausibility ---
@@ -388,11 +393,11 @@ class Tracker:
         print(
             "⚽ Ball pipeline (post-transform): "
             f"aceptados {kept}, "
-            f"rechazados por bounds {removed_bounds}, "
+            f"rechazados por bounds {len(out_of_bounds_events)}, "
             f"por speed {removed_speed} (limit {max_speed_mps} m/s)"
         )
 
-        return ball_tracks
+        return ball_tracks, out_of_bounds_events
 
     def filter_static_ball_clusters(self, ball_tracks, fps=None,
                                     radius_m=None, window_frames=None):

@@ -18,7 +18,7 @@
 | — | Heatmaps precisos por jugador | ✅ Completo (desbloqueado por nuevo modelo_cancha) |
 | T2 | Cross-chunk ReID | 🔲 Pendiente |
 | T3 | Reentrenamiento `best_100e.pt` (cámara baja) | ✅ Completo — `best_jugadores_v2.pt` validado sobre `video_OG.mp4` (footage real de Dinamó, cámara 3-4m): mAP50 0.983, id_churn_ratio 3.24→2.46. Fallback a `best_100e.pt` por 1-2 semanas de uso real. |
-| — | Análisis de balón parado | 🔲 Pendiente |
+| — | Análisis de balón parado | ✅ Completo (backend + dashboard). Pendiente validar detección contra `video_OG.mp4` real. |
 
 ---
 
@@ -180,39 +180,42 @@ bridge.relabel_json(chunk_json, chunk_idx, global_id_maps)  # reescribe IDs
 
 ---
 
-### 🔲 Análisis de balón parado
+### ✅ Análisis de balón parado
 
 **Objetivo:** detectar automáticamente los momentos de balón parado del partido (córners, faltas, saques de banda) y presentarlos al entrenador como una línea de tiempo navegable desde el dashboard. El cliente lo pidió explícitamente — es una feature de producto, no solo una mejora de modelo.
 
-**Corrección importante al plan original:** se asumía que el pipeline ya exportaba datos de balón (`speed_over_time`, `position_history`) en `match_data.json`. Verificado en código: **falso**. `data_exporter/data_exporter.py` solo procesa `tracks['players']`; no hay ninguna clave `"ball"` en el JSON exportado hoy. Además, `Trackers/tracker.py::filter_ball_positions_by_speed` colapsa tanto los rechazos "fuera de campo" (Stage A) como "velocidad físicamente imposible" (Stage B) al mismo `{}` vacío — indistinguible de una oclusión normal del detector, sin conservar causa ni última posición/velocidad válida antes del hueco.
+**Corrección importante al plan original:** se asumía que el pipeline ya exportaba datos de balón (`speed_over_time`, `position_history`) en `match_data.json`. Verificado en código: **falso**. `data_exporter/data_exporter.py` solo procesaba `tracks['players']`; no había ninguna clave `"ball"` en el JSON exportado. Además, `Trackers/tracker.py::filter_ball_positions_by_speed` colapsaba los rechazos "fuera de campo" (Stage A) al mismo `{}` que una oclusión normal, sin conservar causa ni posición. Ambos se corrigieron como parte de esta implementación.
 
-**Enfoque revisado: dos señales complementarias (no una sola regla)**
+**Enfoque implementado: dos señales complementarias**
 
-1. **Balón sale de la cancha y reaparece → córner / saque de banda / saque de meta** (señal de alta precisión, más confiable que "velocidad baja cerca de una esquina": un córner no necesariamente tiene el balón quieto antes de patearse).
-   Se detecta un hueco en `position_history` del balón cuyo origen fue específicamente un rechazo "fuera de campo" (no una oclusión normal), seguido de reaparición dentro del campo. La posición de reaparición clasifica el tipo:
-   - Cerca de esquina (**radio < 5m**, ajustado desde los 3m del borrador original — el error medio de homografía medido es ~5.5m, con 3m el propio margen de error del sistema ya generaba falsos negativos) → córner.
-   - Cerca de línea lateral (mismo margen) → saque de banda.
-   - Cerca de línea de fondo fuera de las esquinas → saque de meta.
+1. **Balón sale de la cancha y reaparece → córner / saque de banda / saque de meta.**
+   `filter_ball_positions_by_speed` ahora también devuelve `out_of_bounds_events` (frame + posición exacta del rechazo Stage A). `analytics/set_piece_detector.py::detect_boundary_events` detecta un hueco en `position_history` del balón que contenga al menos un frame de `out_of_bounds_events` (no una oclusión normal), y clasifica por el **punto de SALIDA** — no el de reaparición como decía el borrador original. Corrección hecha durante la implementación: un córner o saque de meta no reaparece donde el balón salió (se saca hacia dentro del campo), así que el punto de salida es la señal fiable; la de reaparición no lo es.
+   - Salida cerca de esquina (radio ≤5m, ajustado desde los 3m del borrador — error medio de homografía medido ~5.5m) → córner.
+   - Salida cerca de línea de fondo (fuera de las esquinas) → saque de meta.
+   - Salida cerca de línea lateral → saque de banda.
+2. **Balón casi inmóvil sin haber salido de cancha, durante ≥5s** (`detect_stationary_events`, subido desde 1s del borrador — 1s es indistinguible de un jugador controlando el balón un instante) → falta / tiro libre.
 
-2. **Balón casi inmóvil sin haber salido de cancha, durante ≥5s** (subido desde 1s del borrador original — 1s es indistinguible de un jugador controlando el balón un instante; 5s es mucho más específico de una detención real de juego) → falta / tiro libre.
+**Dónde vive el código:**
+- `config.py` — `SET_PIECE_STATIONARY_SEC`, `SET_PIECE_STATIONARY_KMH`, `SET_PIECE_BOUNDARY_MARGIN_M`, `SET_PIECE_MIN_GAP_FRAMES`.
+- `Trackers/tracker.py::filter_ball_positions_by_speed` — ahora devuelve `(ball_tracks, out_of_bounds_events)`.
+- `analytics/set_piece_detector.py` (nuevo, funciones puras) — `detect_boundary_events`, `detect_stationary_events`, `detect_set_pieces`.
+- `Main.py` — corre la detección tras el filtrado de balón, pasa el resultado al exportador.
+- `data_exporter/data_exporter.py` — nuevo `ball` (position_history/speed_over_time, mismo formato que un jugador) y `set_pieces` (con `start_sec`/`end_sec` ya calculados para que el dashboard solo tenga que hacer `currentTime = start_sec`).
 
-**Prerequisitos de datos (trabajo nuevo, no contemplado en la estimación original):**
-- **Exportar balón a `match_data.json`:** añadir `position_history`/`speed_over_time` del balón en `data_exporter/data_exporter.py`. Requiere actualizar `match.ts` en el dashboard en el mismo cambio (regla del repo: no se toca el schema sin que el frontend lo consuma).
-- **Preservar causa del descarte en `filter_ball_positions_by_speed`:** en vez de `ball_tracks[frame_num] = {}` al rechazar, etiquetar la causa (`out_of_bounds` vs `speed_reject` vs sin detección) y conservar la última posición/velocidad válida antes del hueco — sin esto la señal 1 (salió de cancha) es imposible de implementar de forma confiable.
+**Dashboard (SP.c/d) — implementado según diseño acordado con Gonzalo:**
+1. Mapa de calor y vídeo lado a lado (mitad cada uno) en vez de apilados — `src/routes/index.tsx`, sin redimensionar el resto de la página (`MatchHeader` y la barra derecha quedan igual).
+2. `SetPiecesCard` nuevo (`src/components/player/SetPiecesCard.tsx`) bajo `PlayerCard` en la barra derecha, mismo estilo visual (`rounded-xl border bg-card p-4 shadow-lg`). 4 pestañas clicables (Falta/Córner/Banda/Meta), Falta como vista por defecto.
+3. Click en cualquier evento listado salta el vídeo a ese segundo, reutilizando `VideoContext.seekToMinute` (el mismo mecanismo que ya usa `SpeedChart`).
+- Verificado con un `match_data.json` sintético vía Playwright: layout, filtrado por pestaña y click-to-seek funcionan correctamente.
 
-**Sub-tareas:**
-- **SP.a — Exportar balón + causa de descarte** (backend, prerequisito de datos para ambas señales).
-- **SP.b — Lógica combinada** en `analytics/set_piece_detector.py` (las dos reglas de arriba). Output: campo `set_pieces` en `match_data.json` (lista de eventos con `type`, `frame_start`, `frame_end`, `position_m`).
-- **SP.c — Diseño de representación en el dashboard** — 🔲 pendiente de definir con Gonzalo antes de tocar código de frontend (cómo se muestra la línea de tiempo, qué interacción tiene con el vídeo).
-- **SP.d — Implementación dashboard** (PR conjunto con backend, según regla del repo).
+**Validación pendiente (no bloqueante, siguiente paso):**
+- Correr sobre `video_OG.mp4` real y revisar manualmente que los eventos detectados corresponden a balones parados reales — la lógica se probó con datos sintéticos, no contra el vídeo real todavía.
+- Ajustar `SET_PIECE_STATIONARY_SEC`/`SET_PIECE_BOUNDARY_MARGIN_M` si la tasa de falsos positivos/negativos no es aceptable.
 
-**Validación:**
-- Correr sobre `video_OG.mp4` y revisar manualmente que los eventos detectados corresponden a balones parados reales.
-- Falsos positivos esperados en la señal 2: jugador que controla el balón quieto durante varios segundos. Ajustar el umbral hasta que la tasa sea aceptable.
-- Riesgo nuevo en la señal 1: la "última posición antes del hueco" no siempre está cerca del borde real (ej. balón pateado fuerte hacia fuera, el último frame válido puede estar lejos de la línea) — si esto genera muchos falsos negativos, se ajustaría con proyección de trayectoria, post-MVP.
+**Límite conocido:** `run_chunked.py` no fusiona `set_pieces` entre chunks todavía (su `_merge_chunks` reconstruye el JSON campo a campo y no conoce esta clave nueva) — solo las corridas de `Main.py` sin chunking exportan `set_pieces` hoy. Fuera de alcance de esta iteración; abordar si/cuando haga falta procesar partidos completos por chunks con esta feature activa.
 
-**Esfuerzo:** 3-5 días (subió desde 2-3 días por el trabajo de exportación de balón + preservar causa de descarte, no contemplado originalmente).
-**Riesgo:** bajo-medio.
+**Esfuerzo real:** ~1 sesión (backend + frontend juntos, dentro del rango revisado de 3-5 días).
+**Riesgo:** bajo-medio — pendiente la validación contra vídeo real antes de considerarlo probado en producción.
 
 ---
 
@@ -221,8 +224,8 @@ bridge.relabel_json(chunk_json, chunk_idx, global_id_maps)  # reescribe IDs
 | Orden | Tier | Motivo |
 |-------|------|--------|
 | ~~1~~ | ~~T3 — Reentrenar `best_100e.pt`~~ | ✅ Completo. |
-| 1 | **Balón parado (MVP rule-based)** | Feature nueva de alto impacto para Dinamó, sin bloqueadores técnicos. |
-| 2 | **T2 — Cross-chunk ReID** | El más complejo; crítico para que las stats de partido completo (heatmaps, distancia) sean correctas a lo largo de 90 min. |
+| ~~2~~ | ~~Balón parado (MVP rule-based)~~ | ✅ Completo (backend + dashboard). Pendiente validar contra `video_OG.mp4` real. |
+| 1 | **T2 — Cross-chunk ReID** | El más complejo; crítico para que las stats de partido completo (heatmaps, distancia) sean correctas a lo largo de 90 min. |
 
 ---
 

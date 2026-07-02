@@ -61,6 +61,26 @@ export interface PlayerStats {
   derived?: PlayerDerived;
 }
 
+/** Balón — mismo formato que un jugador, sin stats de distancia/aceleración. */
+export interface BallStats {
+  /** [x, y] en metros. null en los frames donde no hubo detección válida. */
+  position_history: Array<[number, number] | null>;
+  /** Velocidad en km/h, uno por segundo. null cuando no hay datos ese segundo. */
+  speed_over_time: Array<number | null>;
+}
+
+export type SetPieceType = "corner" | "banda" | "meta" | "falta";
+
+export interface SetPieceEvent {
+  type: SetPieceType;
+  frame_start: number;
+  frame_end: number;
+  /** Segundo del vídeo al que saltar al hacer click (= frame_start / fps) */
+  start_sec: number;
+  end_sec: number;
+  position_m: [number, number] | null;
+}
+
 export interface MatchData {
   match_meta: MatchMeta;
   players: Record<string, PlayerStats>;
@@ -68,6 +88,10 @@ export interface MatchData {
   schema_version?: number;
   /** Team-level stats keyed by team ID string — present only in schema v2 */
   team_stats?: Record<string, TeamStats>;
+  /** Present only in schema v2. Ausente en runs por chunks (run_chunked.py no
+   * fusiona set_pieces todavía — ver docs/PLAN_player_tracking.md). */
+  ball?: BallStats;
+  set_pieces?: SetPieceEvent[];
 }
 
 /** Fully-typed v2 match document — all derived fields are guaranteed present */

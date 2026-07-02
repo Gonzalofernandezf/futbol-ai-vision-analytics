@@ -137,6 +137,15 @@ PITCH_LENGTH_M      = float(os.getenv("PITCH_LENGTH_M",      "100.0"))
 PITCH_WIDTH_M       = float(os.getenv("PITCH_WIDTH_M",       "64.0"))
 PITCH_MARGIN_M      = float(os.getenv("PITCH_MARGIN_M",      "5.0"))   # tolerance beyond edge before discarding
 
+# Set-piece detection (análisis de balón parado) — ver docs/PLAN_player_tracking.md
+SET_PIECE_STATIONARY_SEC    = float(os.getenv("SET_PIECE_STATIONARY_SEC",    "5.0"))  # min. tiempo casi inmóvil para contar como falta/tiro libre
+SET_PIECE_STATIONARY_KMH    = float(os.getenv("SET_PIECE_STATIONARY_KMH",    "1.0"))  # techo de velocidad para considerar "inmóvil"
+# Radio/margen para clasificar córner/banda/meta al salir de cancha — alineado con
+# el error medio de homografía medido (~5.5m); con un margen más ajustado (ej. 3m)
+# el propio ruido del sistema de coordenadas genera falsos negativos.
+SET_PIECE_BOUNDARY_MARGIN_M = float(os.getenv("SET_PIECE_BOUNDARY_MARGIN_M", "5.0"))
+SET_PIECE_MIN_GAP_FRAMES    = int  (os.getenv("SET_PIECE_MIN_GAP_FRAMES",    "5"))    # min. frames de hueco para no confundir un parpadeo de detección con una salida real
+
 # Visualization
 DISTANCE_THRESHOLD_PIXELS = float(os.getenv("DISTANCE_THRESHOLD_PIXELS", "60"))
 
