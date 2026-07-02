@@ -140,6 +140,14 @@ PITCH_MARGIN_M      = float(os.getenv("PITCH_MARGIN_M",      "5.0"))   # toleran
 # Visualization
 DISTANCE_THRESHOLD_PIXELS = float(os.getenv("DISTANCE_THRESHOLD_PIXELS", "60"))
 
+# Escala de las anotaciones dibujadas sobre el frame (caja de ID, texto de
+# velocidad/distancia, overlay de posesión). Los tamaños base en Trackers/tracker.py
+# y speed_and_distance_estimator.py están calibrados para FRAME_SCALE=1.0 (resolución
+# completa); si no se reescalan junto con FRAME_SCALE, quedan desproporcionadamente
+# grandes al procesar a resolución reducida. Piso de 0.4 para que el texto no se
+# vuelva ilegible en escalas muy bajas (p.ej. FRAME_SCALE=0.33).
+ANNOTATION_SCALE = max(FRAME_SCALE, float(os.getenv("ANNOTATION_SCALE_FLOOR", "0.4")))
+
 # Logging
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 

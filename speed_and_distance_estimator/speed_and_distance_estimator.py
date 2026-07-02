@@ -3,7 +3,7 @@ import sys
 import numpy as np
 sys.path.append("../")
 
-from config import MAX_SPEED_KMH, SPEED_MEDIAN_WINDOW
+from config import MAX_SPEED_KMH, SPEED_MEDIAN_WINDOW, ANNOTATION_SCALE
 
 """
 Speed and Distance Calculation Module
@@ -188,7 +188,7 @@ class SpeedAndDistance_Estimator():
     def draw_speed_and_distance(self, frames, tracks):
         output_frames = []
         for frame_num, frame in enumerate(frames):
-            frame = frame.copy() # Don't overwrite original 
+            frame = frame.copy() # Don't overwrite original
 
             for object, object_tracks in tracks.items():
                 if object == "ball" or object == "referees": continue
@@ -197,28 +197,32 @@ class SpeedAndDistance_Estimator():
                     # Try to get the data. If they don't exist, return None.
                         speed = track_info.get('speed', None)
                         distance = track_info.get('distance', None)
-                        
+
                         # If there is no data (neither calculated nor inherited), skip to the next.
-                        if speed is None or distance is None: 
+                        if speed is None or distance is None:
                             continue
-                        
+
                         bbox = track_info['bbox']
+                        offset = round(10 * ANNOTATION_SCALE)
                         position = (int(bbox[2]), int(bbox[3])) # bottom right corner
-                        position = (position[0] + 10, position[1]) # a little to the right
+                        position = (position[0] + offset, position[1]) # a little to the right
 
                         # Draw texts
-                        cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                        cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                        
-                        cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                        cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                        font_scale, thickness_bg, thickness_fg, line_gap = self._text_style()
+                        cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness_bg)
+                        cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness_fg)
+
+                        cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1]+line_gap), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness_bg)
+                        cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1]+line_gap), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness_fg)
 
             output_frames.append(frame)
-        
+
         return output_frames
 
     def draw_speed_and_distance_frame(self, frame, frame_num, tracks):
         """Dibuja velocidad y distancia sobre un único frame (para render en streaming)."""
+        offset = round(10 * ANNOTATION_SCALE)
+        font_scale, thickness_bg, thickness_fg, line_gap = self._text_style()
         for object, object_tracks in tracks.items():
             if object in ("ball", "referees"):
                 continue
@@ -228,12 +232,22 @@ class SpeedAndDistance_Estimator():
                 if speed is None or distance is None:
                     continue
                 bbox = track_info['bbox']
-                position = (int(bbox[2]) + 10, int(bbox[3]))
-                cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                position = (int(bbox[2]) + offset, int(bbox[3]))
+                cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness_bg)
+                cv2.putText(frame, f"{speed:.1f} km/h", position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness_fg)
+                cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1] + line_gap), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness_bg)
+                cv2.putText(frame, f"{distance:.1f} m", (position[0], position[1] + line_gap), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness_fg)
         return frame
+
+    @staticmethod
+    def _text_style():
+        """Tamaño/grosor de fuente escalados por ANNOTATION_SCALE (ver config.py),
+        con piso mínimo para que el texto siga siendo legible a escalas bajas."""
+        font_scale = max(0.3, round(0.5 * ANNOTATION_SCALE, 3))
+        thickness_bg = max(1, round(2 * ANNOTATION_SCALE))
+        thickness_fg = max(1, round(1 * ANNOTATION_SCALE))
+        line_gap = max(10, round(20 * ANNOTATION_SCALE))
+        return font_scale, thickness_bg, thickness_fg, line_gap
 
     def measure_distance(self, p1, p2):
         # Pythagoras: a^2 + b^2 = c^2

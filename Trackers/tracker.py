@@ -139,9 +139,10 @@ class Tracker:
 
     # Drawing functions
     def draw_ellipse(self, frame, bbox, color, track_id=None):
-        y2 = int(bbox[3]) # Bottom part of the box (feet) 
+        y2 = int(bbox[3]) # Bottom part of the box (feet)
         x_center, _ = self.get_center_of_bbox(bbox)
         width = self.get_bbox_width(bbox)
+        scale = _cfg.ANNOTATION_SCALE
 
         # Draw the ellipse under the feet
         cv2.ellipse(
@@ -152,54 +153,56 @@ class Tracker:
             startAngle=-45,
             endAngle=235,
             color=color,
-            thickness=2,
+            thickness=max(1, round(2 * scale)),
             lineType=cv2.LINE_4
         )
 
         # Optional: Draw rectangle with the ID number
         if track_id is not None:
-            rectangle_width = 40
-            rectangle_height = 20
+            rectangle_width = max(20, round(40 * scale))
+            rectangle_height = max(10, round(20 * scale))
+            y_offset = round(15 * scale)
             x1_rect = x_center - rectangle_width//2
             x2_rect = x_center + rectangle_width//2
-            y1_rect = (y2 - rectangle_height//2) + 15
-            y2_rect = (y2 + rectangle_height//2) + 15
+            y1_rect = (y2 - rectangle_height//2) + y_offset
+            y2_rect = (y2 + rectangle_height//2) + y_offset
 
-            if track_id is not None:
+            cv2.rectangle(frame,
+                          (int(x1_rect), int(y1_rect)),
+                          (int(x2_rect), int(y2_rect)),
+                          color,
+                          cv2.FILLED)
 
-                cv2.rectangle(frame,
-                              (int(x1_rect), int(y1_rect)),
-                              (int(x2_rect), int(y2_rect)),
-                              color,
-                              cv2.FILLED)
+            x1_text = x1_rect + round(12 * scale)
+            if track_id > 99:
+                x1_text -= round(10 * scale)
 
-                x1_text = x1_rect + 12
-                if track_id > 99:
-                    x1_text -= 10
-
-                cv2.putText(
-                    frame,
-                    f"{track_id}",
-                    (int(x1_text), int(y1_rect+15)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0,0,0),
-                    2
-                )
+            cv2.putText(
+                frame,
+                f"{track_id}",
+                (int(x1_text), int(y1_rect + y_offset)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                max(0.35, round(0.6 * scale, 3)),
+                (0,0,0),
+                max(1, round(2 * scale))
+            )
         return frame
 
     def draw_triangle(self, frame, bbox, color):
-        y = int(bbox[1]) # Upper part of the box 
+        y = int(bbox[1]) # Upper part of the box
         x, _ = self.get_center_of_bbox(bbox)
+        scale = _cfg.ANNOTATION_SCALE
+        half_w = max(4, round(10 * scale))
+        height = max(8, round(20 * scale))
         triangle_points = np.array([
             [x, y],
-            [x-10, y-20],
-            [x+10, y-20],
+            [x - half_w, y - height],
+            [x + half_w, y - height],
         ])
 
         # Draw inverted triangle over the ball
         cv2.drawContours(frame, [triangle_points], 0, color, cv2.FILLED)
-        cv2.drawContours(frame, [triangle_points], 0, (0,0,0), 2) # Black outlline 
+        cv2.drawContours(frame, [triangle_points], 0, (0,0,0), max(1, round(2 * scale))) # Black outlline
         return frame
 
     def draw_annotations(self, video_frames, tracks):
@@ -465,9 +468,19 @@ class Tracker:
         return ball_tracks
 
     def draw_team_ball_control(self, frame, frame_num, team_ball_control):
+        # Coordenadas base calibradas para FRAME_SCALE=1.0 (vídeo ~1920x1080);
+        # se escalan junto con el frame para que el HUD no quede desproporcionado
+        # cuando se procesa a resolución reducida (ver config.ANNOTATION_SCALE).
+        scale = _cfg.ANNOTATION_SCALE
+
         # 1. Transparent overlay (same as before)
         overlay = frame.copy()
-        cv2.rectangle(overlay, (1350, 850), (1900, 970), (255, 255, 255), -1)
+        cv2.rectangle(
+            overlay,
+            (round(1350 * scale), round(850 * scale)),
+            (round(1900 * scale), round(970 * scale)),
+            (255, 255, 255), -1,
+        )
         alpha = 0.4
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
@@ -489,7 +502,9 @@ class Tracker:
             team_2_perc = team_2_num_frames / total_frames
 
         # 4. Write text (same as before)
-        cv2.putText(frame, f"Team 1 Possession: {team_1_perc*100:.1f}%", (1400, 900), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
-        cv2.putText(frame, f"Team 2 Possession: {team_2_perc*100:.1f}%", (1400, 950), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 3)
+        font_scale = max(0.4, round(1.0 * scale, 3))
+        thickness = max(1, round(3 * scale))
+        cv2.putText(frame, f"Team 1 Possession: {team_1_perc*100:.1f}%", (round(1400 * scale), round(900 * scale)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,0), thickness)
+        cv2.putText(frame, f"Team 2 Possession: {team_2_perc*100:.1f}%", (round(1400 * scale), round(950 * scale)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,0), thickness)
 
         return frame
