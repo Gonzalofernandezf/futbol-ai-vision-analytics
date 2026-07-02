@@ -30,16 +30,20 @@ try:
 except ImportError:
     sys.exit("Falta el paquete 'roboflow'. Instalar con: pip install roboflow")
 
-# Deben coincidir con las clases de best_100e.pt (ver Trackers/tracker.py,
-# que remapea 'goalkeeper' -> 'player' después de la inferencia).
-CANONICAL_CLASSES = ["ball", "goalkeeper", "player", "referee"]
+# best_100e.pt solo se usa hoy para jugador/portero/árbitro — el balón lo cubre
+# modelo_balon.pt por separado (Tier ya completo). No se incluye "ball" aquí a
+# propósito: sus cajas se descartan en build_remap() para no meter ruido de
+# objeto pequeño en el fine-tuning de este modelo.
+CANONICAL_CLASSES = ["goalkeeper", "player", "referee"]
 
 # version=None -> se resuelve la última versión publicada del proyecto en tiempo
 # de ejecución (evita hardcodear un número que puede quedar desactualizado).
+# Solo datasets de cámara lateral/tribuna (coherentes con el caso Dinamó); se
+# descartó "football-player-detection" de yolo-fifa por ser cámara aérea vertical
+# detrás de portería.
 DATASET_SPECS = [
     {"workspace": "object-detection-in-football-q1i5u", "project": "football-side-camera", "version": None},
     {"workspace": "roboflow-jvuqo", "project": "football-players-detection-3zvbc", "version": None},
-    {"workspace": "yolo-fifa", "project": "football-player-detection-kucab-q6iig-zpsoy", "version": None},
     {"workspace": "ilyes-talbi-ptwsp", "project": "futbol-players", "version": None},
 ]
 
@@ -48,14 +52,13 @@ MERGED_DIR = Path(__file__).parent / "merged"
 SPLITS = ["train", "valid", "test"]
 
 # Alias conocidos -> clase canónica. Cualquier nombre de clase no listado aquí
-# se descarta (p.ej. "goal", "logo", "crowd").
+# (incluido el balón) se descarta (p.ej. "ball", "goal", "logo", "crowd").
 CLASS_ALIASES = {
     "goalkeeper": "goalkeeper", "gk": "goalkeeper",
     "player": "player", "players": "player",
     "team a": "player", "team b": "player", "home": "player", "away": "player",
     "referee": "referee", "ref": "referee",
     "main referee": "referee", "side referee": "referee", "assistant referee": "referee",
-    "ball": "ball", "football": "ball", "soccer ball": "ball", "sports ball": "ball",
 }
 
 
