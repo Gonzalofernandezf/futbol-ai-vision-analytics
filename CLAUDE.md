@@ -271,13 +271,18 @@ con estilo PEP 8. Si se añade linting, hacerlo en un PR dedicado y actualizar a
   1. Resumir el problema en 2-3 frases.
   2. Proponer 1-2 enfoques con pros/contras.
   3. Esperar a que confirme el enfoque, salvo que la tarea sea claramente trivial.
-- Cambios siempre vía Pull Request, nunca directo a `main`.
-- Un PR = un cambio con una intención. Nada de PRs "limpieza + feature + refactor".
-- En la descripción del PR incluir: qué prioridad del cliente ataca (heatmaps,
-  balón parado, tags en vivo, robustez cámara baja, etc.), qué se probó, y
-  qué quedó fuera a propósito.
-- Si algo del repo contradice este archivo, gana este archivo y se abre un PR
-  para alinear lo demás.
+- Flujo de git con Claude Code: Claude crea una rama, trabaja y commitea ahí,
+  y al terminar la mergea directo a `main` (sin Pull Request — se decidió así
+  explícitamente, no usamos revisión vía PR en este flujo). Después del merge,
+  Claude le da a Gonzalo el comando exacto para sincronizar su `main` local
+  (`git fetch origin && git checkout main && git pull origin main`, o
+  equivalente). El `main` local de Gonzalo debe reflejar siempre el `main`
+  remoto tras cada tarea — nunca debe quedarse trabajando sobre una rama de
+  feature.
+- Un cambio = una intención. Nada de commits "limpieza + feature + refactor"
+  mezclados.
+- Si algo del repo contradice este archivo, gana este archivo y se corrige
+  directamente en `main` siguiendo el flujo de arriba.
 
 ---
 
