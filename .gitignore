@@ -43,6 +43,7 @@ env/
 stubs/
 output_videos/
 eval/results/*.json
+eval/results_ball/*.json
 *.mp4
 # Model weights – never commit, copy manually from training outputs
 *.pt
@@ -53,6 +54,10 @@ futbol-ai-dashboard/public/match_data.json
 futbol-ai-dashboard/public/demo_video.mp4
 futbol-ai-dashboard/public/eval_report.json
 futbol-ai-dashboard/public/eval_history.json
+futbol-ai-dashboard/public/eval_ball_report.json
+futbol-ai-dashboard/public/eval_ball_history.json
+futbol-ai-dashboard/public/reports/
+futbol-ai-dashboard/public/reports_ball/
 futbol-ai-dashboard/public/processing_meta.json
 futbol-ai-dashboard/node_modules/
 futbol-ai-dashboard/dist/
