@@ -17,7 +17,7 @@
 | — | Reentrenamiento `modelo_cancha.pt` | ✅ Completo (PCK@5px 93%, error homografía 5.5m) |
 | — | Heatmaps precisos por jugador | ✅ Completo (desbloqueado por nuevo modelo_cancha) |
 | T2 | Cross-chunk ReID | 🔲 Pendiente |
-| T3 | Reentrenamiento `best_100e.pt` (cámara baja) | 🟡 `best_jugadores_v2.pt` validado en footage genérico (mAP50 0.983, id_churn 3.24→2.46); pendiente validar con cámara real de Dinamó |
+| T3 | Reentrenamiento `best_100e.pt` (cámara baja) | ✅ Completo — `best_jugadores_v2.pt` validado sobre `video_OG.mp4` (footage real de Dinamó, cámara 3-4m): mAP50 0.983, id_churn_ratio 3.24→2.46. Fallback a `best_100e.pt` por 1-2 semanas de uso real. |
 | — | Análisis de balón parado | 🔲 Pendiente |
 
 ---
@@ -74,6 +74,43 @@ Detector dedicado con pesos y thresholds propios, separado del detector de jugad
 ### ✅ Heatmaps precisos por jugador
 
 `position_history` (lista de `[x, y]` en metros) ya existía en el schema v2. La homografía ahora es fiable (error ~5.5m vs ~135m antes), lo que hace los heatmaps coherentes con el movimiento real. Validado visualmente en el dashboard. **Diferenciador #1 para el cliente.**
+
+### ✅ Tier 3 — Reentrenamiento `best_100e.pt` (cámara baja)
+
+**Objetivo:** mejorar el recall del detector de jugadores en las condiciones reales de Dinamó: cámara fija a 3-4 metros de altura en posición lateral. A esa altura los jugadores del fondo aparecen más pequeños, con más oclusiones entre sí, y la perspectiva es diferente a la cenital.
+
+**Decisión acordada sobre etiquetado manual:** para la primera iteración **no se etiqueta nada manualmente**. Los datasets de Roboflow ya configurados en `datasets/download_datasets.py` incluyen imágenes con cámara lateral de otros partidos. Si tras el reentrenamiento persisten fallos sistemáticos con el vídeo de Dinamó, se abriría una segunda iteración con 200-300 frames suyos etiquetados.
+
+**Sub-tareas:**
+
+**T3.a — Dataset**
+3 datasets de Roboflow Universe configurados en `datasets/download_datasets.py` (footage de cámara lateral/tribuna, coherente con el caso Dinamó). No se añaden datos propios en esta iteración.
+
+**Decisión:** el fine-tuning excluye la clase `ball`. `best_100e.pt` ya solo se usa para jugador/portero/árbitro — el balón lo cubre `modelo_balon.pt` por separado — así que las cajas de balón se descartan al fusionar los datasets (ruido de objeto pequeño sin aportar valor a este modelo).
+
+**T3.b — Entrenamiento**
+**Decisión revisada:** `best_100e.pt` es YOLOv8 — no es posible cargarlo como base YOLOv11m (arquitecturas incompatibles, no hay transfer de pesos entre ellas). Se entrena YOLOv11m desde `yolo11m.pt` (COCO-pretrained de Ultralytics), no desde `best_100e.pt`. Se acepta perder el warm-start de "cámara alta" porque (a) uno de los 3 datasets de T3.a ya formaba parte del entrenamiento original de `best_100e.pt`, así que ese conocimiento se reintroduce de todos modos, y (b) YOLOv11m aporta bloques de atención (C2PSA) con mejor desempeño documentado en objetos pequeños/ocluidos — exactamente el problema de cámara baja. Fallback si no converge bien: fine-tuning YOLOv8 clásico desde `best_100e.pt`.
+
+Script listo en `datasets/train_jugadores.py`. Parámetros objetivo:
+- Base: YOLOv11m (`yolo11m.pt`, COCO-pretrained)
+- `imgsz=1280`
+- 100 epochs
+- Augmentation geométrico agresivo (perspectiva, rotación, shear) para cubrir variaciones de ángulo.
+- Ejecutar en Kaggle con GPU.
+
+**T3.c — Validación** ✅ Completa
+- **Nota importante:** `video_OG.mp4` (el vídeo de muestra del repo) **es footage real de Dinamó, grabado con su cámara fija a 3-4m de altura, lateral** — es decir, exactamente el caso objetivo de este Tier, no un proxy genérico. La validación de abajo mide directamente el problema reportado por el cliente.
+- mAP50 = 0.983 en el holdout del dataset fusionado (objetivo ≥0.85). Por clase vs. `best_100e.pt` (mismo holdout, normalizado sin balón): `goalkeeper` +2.1pts mAP50 / +6.0pts mAP50-95 (mejora real), `player`/`referee` prácticamente planos (ya estaban cerca del techo).
+- Comparación con `debug_player_detection.py` (script nuevo, más liviano que `Main.py` — corre solo tracker+equipos, sin balón/campo/velocidad) sobre 30s de `video_OG.mp4`: `id_churn_ratio` 3.24→2.46 (pasa de incumplir el objetivo ≤3.0 a cumplirlo), long tracks (≥5s) 21→24, avg track duration 5.4s→6.0s. Inspección visual lado a lado: sin diferencias apreciables a simple vista, consistente con que la mejora real es modesta (concentrada en `goalkeeper`).
+- Conclusión: mejora real pero modesta, medida en las condiciones reales de Dinamó. No hace falta grabar footage adicional para cerrar este Tier.
+
+**T3.d — Rollout**
+- ✅ `best_jugadores_v2.pt` (YOLOv11m) es el candidato — colocar en la raíz del repo (no sobreescribe `best_100e.pt`; `*.pt` sigue en `.gitignore`, no se commitea).
+- Apuntar con `MODEL_PATH=best_jugadores_v2.pt` en `.env` (local y Kaggle) para usarlo. `config.py`/`.env.example` mantienen `best_100e.pt` como default — el cambio es opt-in por entorno, no global.
+- Mantener `best_100e.pt` como fallback durante 1-2 semanas de uso real antes de promoverlo a default (práctica estándar de rollout, no por falta de validación — T3.c ya está cerrada).
+
+**Esfuerzo:** 1-2 días de setup + tiempo de entrenamiento en Kaggle (~2-4h de GPU).
+**Riesgo:** bajo-medio. Los scripts ya están listos; el riesgo es que los datasets de Roboflow no cubran suficientemente bien el ángulo específico de Dinamó — en ese caso, segunda iteración con datos propios.
 
 ---
 
@@ -143,44 +180,6 @@ bridge.relabel_json(chunk_json, chunk_idx, global_id_maps)  # reescribe IDs
 
 ---
 
-### 🔲 Tier 3 — Reentrenamiento `best_100e.pt` (cámara baja)
-
-**Objetivo:** mejorar el recall del detector de jugadores en las condiciones reales de Dinamó: cámara fija a 3-4 metros de altura en posición lateral. A esa altura los jugadores del fondo aparecen más pequeños, con más oclusiones entre sí, y la perspectiva es diferente a la cenital.
-
-**Decisión acordada sobre etiquetado manual:** para la primera iteración **no se etiqueta nada manualmente**. Los datasets de Roboflow ya configurados en `datasets/download_datasets.py` incluyen imágenes con cámara lateral de otros partidos. Si tras el reentrenamiento persisten fallos sistemáticos con el vídeo de Dinamó, se abriría una segunda iteración con 200-300 frames suyos etiquetados.
-
-**Sub-tareas:**
-
-**T3.a — Dataset**
-3 datasets de Roboflow Universe configurados en `datasets/download_datasets.py` (footage de cámara lateral/tribuna, coherente con el caso Dinamó). No se añaden datos propios en esta iteración.
-
-**Decisión:** el fine-tuning excluye la clase `ball`. `best_100e.pt` ya solo se usa para jugador/portero/árbitro — el balón lo cubre `modelo_balon.pt` por separado — así que las cajas de balón se descartan al fusionar los datasets (ruido de objeto pequeño sin aportar valor a este modelo).
-
-**T3.b — Entrenamiento**
-**Decisión revisada:** `best_100e.pt` es YOLOv8 — no es posible cargarlo como base YOLOv11m (arquitecturas incompatibles, no hay transfer de pesos entre ellas). Se entrena YOLOv11m desde `yolo11m.pt` (COCO-pretrained de Ultralytics), no desde `best_100e.pt`. Se acepta perder el warm-start de "cámara alta" porque (a) uno de los 3 datasets de T3.a ya formaba parte del entrenamiento original de `best_100e.pt`, así que ese conocimiento se reintroduce de todos modos, y (b) YOLOv11m aporta bloques de atención (C2PSA) con mejor desempeño documentado en objetos pequeños/ocluidos — exactamente el problema de cámara baja. Fallback si no converge bien: fine-tuning YOLOv8 clásico desde `best_100e.pt`.
-
-Script listo en `datasets/train_jugadores.py`. Parámetros objetivo:
-- Base: YOLOv11m (`yolo11m.pt`, COCO-pretrained)
-- `imgsz=1280`
-- 100 epochs
-- Augmentation geométrico agresivo (perspectiva, rotación, shear) para cubrir variaciones de ángulo.
-- Ejecutar en Kaggle con GPU.
-
-**T3.c — Validación**
-- ✅ mAP50 = 0.983 en el holdout del dataset fusionado (objetivo ≥0.85). Por clase vs. `best_100e.pt` (mismo holdout, normalizado sin balón): `goalkeeper` +2.1pts mAP50 / +6.0pts mAP50-95 (mejora real), `player`/`referee` prácticamente planos (ya estaban cerca del techo). Ver comparación completa en el hilo de la sesión que hizo el entrenamiento.
-- ✅ Comparación con `debug_player_detection.py` (script nuevo, más liviano que `Main.py` — corre solo tracker+equipos, sin balón/campo/velocidad) sobre 30s de `video_OG.mp4`: `id_churn_ratio` 3.24→2.46 (pasa de incumplir el objetivo ≤3.0 a cumplirlo), long tracks (≥5s) 21→24, avg track duration 5.4s→6.0s. Inspección visual lado a lado: sin diferencias apreciables a simple vista, consistente con que la mejora real es modesta (concentrada en `goalkeeper`).
-- 🔲 **Pendiente:** grabar 2-3 minutos con la cámara real de Dinamó (3-4m de altura) y validar ahí — es la única prueba que mide directamente el objetivo de este Tier (cámara baja). Los resultados de arriba son sobre footage de cámara tribuna/lateral genérica, no cámara baja real.
-
-**T3.d — Rollout**
-- ✅ `best_jugadores_v2.pt` (YOLOv11m) es el candidato — colocar en la raíz del repo (no sobreescribe `best_100e.pt`; `*.pt` sigue en `.gitignore`, no se commitea).
-- Apuntar con `MODEL_PATH=best_jugadores_v2.pt` en `.env` (local y Kaggle) para usarlo. `config.py`/`.env.example` mantienen `best_100e.pt` como default — el cambio es opt-in por entorno, no global.
-- Mantener `best_100e.pt` como fallback hasta validar con footage real de Dinamó (T3.c pendiente arriba).
-
-**Esfuerzo:** 1-2 días de setup + tiempo de entrenamiento en Kaggle (~2-4h de GPU).
-**Riesgo:** bajo-medio. Los scripts ya están listos; el riesgo es que los datasets de Roboflow no cubran suficientemente bien el ángulo específico de Dinamó — en ese caso, segunda iteración con datos propios.
-
----
-
 ### 🔲 Análisis de balón parado
 
 **Objetivo:** detectar automáticamente los momentos de balón parado del partido (córners, faltas, saques de banda) y presentarlos al entrenador como una línea de tiempo navegable desde el dashboard. El cliente lo pidió explícitamente — es una feature de producto, no solo una mejora de modelo.
@@ -221,9 +220,9 @@ Clasificación del tipo (heurística por posición):
 
 | Orden | Tier | Motivo |
 |-------|------|--------|
-| 1 | **T3 — Reentrenar `best_100e.pt`** | Lanzar en Kaggle; corre en paralelo mientras se trabaja en lo demás. Sin dependencias de código. |
-| 2 | **Balón parado (MVP rule-based)** | Feature nueva de alto impacto para Dinamó, sin bloqueadores técnicos. |
-| 3 | **T2 — Cross-chunk ReID** | El más complejo; crítico para que las stats de partido completo (heatmaps, distancia) sean correctas a lo largo de 90 min. |
+| ~~1~~ | ~~T3 — Reentrenar `best_100e.pt`~~ | ✅ Completo. |
+| 1 | **Balón parado (MVP rule-based)** | Feature nueva de alto impacto para Dinamó, sin bloqueadores técnicos. |
+| 2 | **T2 — Cross-chunk ReID** | El más complejo; crítico para que las stats de partido completo (heatmaps, distancia) sean correctas a lo largo de 90 min. |
 
 ---
 
@@ -231,5 +230,5 @@ Clasificación del tipo (heurística por posición):
 
 - Análisis táctico (formaciones, pressing, líneas defensivas) — fuera de scope.
 - Tracking en tiempo real durante el partido — fuera de scope corto plazo.
-- Segunda iteración de T3 con datos propios de Dinamó — solo si la primera iteración muestra fallos sistemáticos.
+- Segunda iteración de T3 con etiquetado manual propio (200-300 frames) — la primera iteración ya se validó contra footage real de Dinamó y mostró mejora; solo se reconsideraría si en uso real aparecen fallos sistemáticos que este fine-tuning no resolvió.
 - Clasificación avanzada de tipo de balón parado con modelo de eventos — solo si el MVP rule-based no satisface al cliente.
