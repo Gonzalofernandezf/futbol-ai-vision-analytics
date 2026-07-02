@@ -184,35 +184,35 @@ bridge.relabel_json(chunk_json, chunk_idx, global_id_maps)  # reescribe IDs
 
 **Objetivo:** detectar automáticamente los momentos de balón parado del partido (córners, faltas, saques de banda) y presentarlos al entrenador como una línea de tiempo navegable desde el dashboard. El cliente lo pidió explícitamente — es una feature de producto, no solo una mejora de modelo.
 
-**Enfoque acordado: regla-based como MVP**
+**Corrección importante al plan original:** se asumía que el pipeline ya exportaba datos de balón (`speed_over_time`, `position_history`) en `match_data.json`. Verificado en código: **falso**. `data_exporter/data_exporter.py` solo procesa `tracks['players']`; no hay ninguna clave `"ball"` en el JSON exportado hoy. Además, `Trackers/tracker.py::filter_ball_positions_by_speed` colapsa tanto los rechazos "fuera de campo" (Stage A) como "velocidad físicamente imposible" (Stage B) al mismo `{}` vacío — indistinguible de una oclusión normal del detector, sin conservar causa ni última posición/velocidad válida antes del hueco.
 
-No se entrena ningún modelo nuevo en esta iteración. Se usan los datos que ya exporta el pipeline en `match_data.json`:
-- Velocidad del balón frame a frame (`speed_over_time` del balón).
-- Posición del balón en metros (`position_history` del balón).
-- Número de jugadores agrupados cerca del balón.
+**Enfoque revisado: dos señales complementarias (no una sola regla)**
 
-**Lógica de detección:**
+1. **Balón sale de la cancha y reaparece → córner / saque de banda / saque de meta** (señal de alta precisión, más confiable que "velocidad baja cerca de una esquina": un córner no necesariamente tiene el balón quieto antes de patearse).
+   Se detecta un hueco en `position_history` del balón cuyo origen fue específicamente un rechazo "fuera de campo" (no una oclusión normal), seguido de reaparición dentro del campo. La posición de reaparición clasifica el tipo:
+   - Cerca de esquina (**radio < 5m**, ajustado desde los 3m del borrador original — el error medio de homografía medido es ~5.5m, con 3m el propio margen de error del sistema ya generaba falsos negativos) → córner.
+   - Cerca de línea lateral (mismo margen) → saque de banda.
+   - Cerca de línea de fondo fuera de las esquinas → saque de meta.
 
-Un evento de balón parado se detecta cuando:
-1. La velocidad del balón cae por debajo de un umbral (p.ej. < 1 km/h) durante más de N frames consecutivos (p.ej. 30 frames = ~1s).
-2. La posición del balón está dentro del campo (descarta pérdidas de detección fuera de campo).
+2. **Balón casi inmóvil sin haber salido de cancha, durante ≥5s** (subido desde 1s del borrador original — 1s es indistinguible de un jugador controlando el balón un instante; 5s es mucho más específico de una detención real de juego) → falta / tiro libre.
 
-Clasificación del tipo (heurística por posición):
-- **Córner:** balón en las 4 esquinas del campo (radio < 3m de cada esquina).
-- **Saque de banda:** balón en la línea lateral (< 2m del borde).
-- **Falta / balón parado en juego:** resto de posiciones.
+**Prerequisitos de datos (trabajo nuevo, no contemplado en la estimación original):**
+- **Exportar balón a `match_data.json`:** añadir `position_history`/`speed_over_time` del balón en `data_exporter/data_exporter.py`. Requiere actualizar `match.ts` en el dashboard en el mismo cambio (regla del repo: no se toca el schema sin que el frontend lo consuma).
+- **Preservar causa del descarte en `filter_ball_positions_by_speed`:** en vez de `ball_tracks[frame_num] = {}` al rechazar, etiquetar la causa (`out_of_bounds` vs `speed_reject` vs sin detección) y conservar la última posición/velocidad válida antes del hueco — sin esto la señal 1 (salió de cancha) es imposible de implementar de forma confiable.
 
-**Dónde va el código:**
-- Lógica de detección → `analytics/set_piece_detector.py` (nuevo módulo).
-- Output → campo `set_pieces` en `match_data.json` (lista de eventos con `type`, `frame_start`, `frame_end`, `position_m`).
-- Frontend → componente de línea de tiempo en el dashboard que permita saltar al minuto del vídeo correspondiente. **Esto requiere PR conjunto backend + dashboard.**
+**Sub-tareas:**
+- **SP.a — Exportar balón + causa de descarte** (backend, prerequisito de datos para ambas señales).
+- **SP.b — Lógica combinada** en `analytics/set_piece_detector.py` (las dos reglas de arriba). Output: campo `set_pieces` en `match_data.json` (lista de eventos con `type`, `frame_start`, `frame_end`, `position_m`).
+- **SP.c — Diseño de representación en el dashboard** — 🔲 pendiente de definir con Gonzalo antes de tocar código de frontend (cómo se muestra la línea de tiempo, qué interacción tiene con el vídeo).
+- **SP.d — Implementación dashboard** (PR conjunto con backend, según regla del repo).
 
 **Validación:**
 - Correr sobre `video_OG.mp4` y revisar manualmente que los eventos detectados corresponden a balones parados reales.
-- Falsos positivos esperados: jugador que controla el balón quieto durante >1s. Ajustar el umbral de frames hasta que la tasa sea aceptable.
+- Falsos positivos esperados en la señal 2: jugador que controla el balón quieto durante varios segundos. Ajustar el umbral hasta que la tasa sea aceptable.
+- Riesgo nuevo en la señal 1: la "última posición antes del hueco" no siempre está cerca del borde real (ej. balón pateado fuerte hacia fuera, el último frame válido puede estar lejos de la línea) — si esto genera muchos falsos negativos, se ajustaría con proyección de trayectoria, post-MVP.
 
-**Esfuerzo:** 2-3 días (lógica analítica + componente dashboard).
-**Riesgo:** bajo. Si la detección rule-based tiene demasiados falsos positivos, la siguiente iteración añadiría un clasificador ligero de eventos — pero eso es post-MVP.
+**Esfuerzo:** 3-5 días (subió desde 2-3 días por el trabajo de exportación de balón + preservar causa de descarte, no contemplado originalmente).
+**Riesgo:** bajo-medio.
 
 ---
 
