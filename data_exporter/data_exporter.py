@@ -38,18 +38,72 @@ class GameStatsExporter:
     def __init__(self, fps=24):
         self.fps = fps
 
+    def _export_ball(self, ball_tracks):
+        """Balón, en el mismo formato que un jugador (position_history en metros,
+        un punto por frame; speed_over_time en km/h, uno por segundo). Necesario
+        para el análisis de balón parado — ver analytics/set_piece_detector.py."""
+        position_history = []
+        speeds_by_second = {}
+        prev_pos = None
+        prev_frame = None
+        fps_int = round(self.fps) or 1
+
+        for frame_num, frame_ball in enumerate(ball_tracks):
+            pos = None
+            if frame_ball and 1 in frame_ball:
+                pos = frame_ball[1].get('position_transformed')
+                if pos is not None:
+                    pos = [round(float(pos[0]), 2), round(float(pos[1]), 2)]
+            position_history.append(pos)
+
+            if pos is not None and prev_pos is not None:
+                dt = (frame_num - prev_frame) / self.fps
+                if dt > 0:
+                    dist_m = ((pos[0] - prev_pos[0]) ** 2 + (pos[1] - prev_pos[1]) ** 2) ** 0.5
+                    speed_kmh = (dist_m / dt) * 3.6
+                    speeds_by_second[frame_num // fps_int] = round(speed_kmh, 2)
+            if pos is not None:
+                prev_pos, prev_frame = pos, frame_num
+
+        total_seconds = len(ball_tracks) // fps_int + 1
+        speed_over_time = [speeds_by_second.get(s) for s in range(total_seconds)]
+
+        return {
+            "position_history": position_history,
+            "speed_over_time": speed_over_time,
+        }
+
+    def _export_set_pieces(self, set_pieces):
+        """Convierte frames -> segundos para que el dashboard pueda saltar el
+        vídeo directamente (currentTime = frame_start_sec)."""
+        out = []
+        fps = self.fps or 1
+        for event in set_pieces:
+            out.append({
+                "type": event["type"],
+                "frame_start": event["frame_start"],
+                "frame_end": event["frame_end"],
+                "start_sec": round(event["frame_start"] / fps, 2),
+                "end_sec": round(event["frame_end"] / fps, 2),
+                "position_m": event.get("position_m"),
+            })
+        return out
+
     # NOW (Add arguments with default value 0 just in case):
-    def export_json(self, tracks, output_path="match_data.json", home_possession=0, away_possession=0, view_transformer=None):
+    def export_json(self, tracks, output_path="match_data.json", home_possession=0, away_possession=0,
+                     view_transformer=None, set_pieces=None):
         # Final structure
         export_data = {
             "schema_version": 2,
             "match_meta": {
                 "duration_seconds": 0,
                 "fps": self.fps,
-                "home_possession": round(home_possession, 1), 
+                "home_possession": round(home_possession, 1),
                 "away_possession": round(away_possession, 1)
             },
-            "players": {}
+            "players": {},
+            "ball": self._export_ball(tracks.get("ball", [])),
+            "set_pieces": self._export_set_pieces(set_pieces or []),
         }
 
         player_stats_temp = {}

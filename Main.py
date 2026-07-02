@@ -13,6 +13,7 @@ from camera_movement_estimator.camera_movement_estimator import CameraMovementEs
 from view_transformer.view_transformer import ViewTransformer
 from speed_and_distance_estimator.speed_and_distance_estimator import SpeedAndDistance_Estimator
 from data_exporter.data_exporter import GameStatsExporter
+from analytics.set_piece_detector import detect_set_pieces
 import shutil
 import config
 
@@ -213,7 +214,7 @@ def main():
     # then removes long stretches where the "ball" doesn't move in real-world metres
     # (pitch stains, socks, centre-spot artefacts the speed filter can't catch).
     with timer.phase("Ball filters"):
-        tracks["ball"] = tracker.filter_ball_positions_by_speed(
+        tracks["ball"], ball_out_of_bounds_events = tracker.filter_ball_positions_by_speed(
             tracks["ball"],
             fps,
             max_speed_mps  = config.BALL_MAX_SPEED_MPS,
@@ -228,6 +229,13 @@ def main():
             radius_m      = config.BALL_STATIC_RADIUS_M,
             window_frames = config.BALL_STATIC_WINDOW_FRAMES,
         )
+
+    # Set-piece detection (balón parado) — corre sobre el balón ya filtrado,
+    # combinando la señal de "salió de cancha" (ball_out_of_bounds_events) con
+    # la de "casi inmóvil sostenido". Ver docs/PLAN_player_tracking.md.
+    with timer.phase("Set-piece detection"):
+        set_pieces = detect_set_pieces(tracks["ball"], ball_out_of_bounds_events, fps)
+    print(f"🚩 Balón parado: {len(set_pieces)} eventos detectados.")
 
     # 6.8. Speed and distance estimation
     speed_and_distance_estimator = SpeedAndDistance_Estimator()
@@ -374,7 +382,11 @@ def main():
         home_poss, away_poss = 0, 0
 
     with timer.phase("Export JSON"):
-        exporter.export_json(tracks, json_output_path, home_possession=home_poss, away_possession=away_poss, view_transformer=view_transformer)
+        exporter.export_json(
+            tracks, json_output_path,
+            home_possession=home_poss, away_possession=away_poss,
+            view_transformer=view_transformer, set_pieces=set_pieces,
+        )
     print(f" 💾  Historical data saved to: {json_output_path}")
 
     # Dump the full tracks dict to pickle for post-hoc rendering.
