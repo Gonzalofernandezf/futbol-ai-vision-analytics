@@ -152,14 +152,17 @@ bridge.relabel_json(chunk_json, chunk_idx, global_id_maps)  # reescribe IDs
 **Sub-tareas:**
 
 **T3.a — Dataset**
-Los 4 datasets de Roboflow ya están configurados en `datasets/download_datasets.py`. Incluyen footage de cámara lateral y a nivel de campo. No se añaden datos propios en esta iteración.
+3 datasets de Roboflow Universe configurados en `datasets/download_datasets.py` (footage de cámara lateral/tribuna, coherente con el caso Dinamó). No se añaden datos propios en esta iteración.
+
+**Decisión:** el fine-tuning excluye la clase `ball`. `best_100e.pt` ya solo se usa para jugador/portero/árbitro — el balón lo cubre `modelo_balon.pt` por separado — así que las cajas de balón se descartan al fusionar los datasets (ruido de objeto pequeño sin aportar valor a este modelo).
 
 **T3.b — Entrenamiento**
-Fine-tuning desde `best_100e.pt` (no desde cero — preserva el conocimiento de cámara alta).
+**Decisión revisada:** `best_100e.pt` es YOLOv8 — no es posible cargarlo como base YOLOv11m (arquitecturas incompatibles, no hay transfer de pesos entre ellas). Se entrena YOLOv11m desde `yolo11m.pt` (COCO-pretrained de Ultralytics), no desde `best_100e.pt`. Se acepta perder el warm-start de "cámara alta" porque (a) uno de los 3 datasets de T3.a ya formaba parte del entrenamiento original de `best_100e.pt`, así que ese conocimiento se reintroduce de todos modos, y (b) YOLOv11m aporta bloques de atención (C2PSA) con mejor desempeño documentado en objetos pequeños/ocluidos — exactamente el problema de cámara baja. Fallback si no converge bien: fine-tuning YOLOv8 clásico desde `best_100e.pt`.
+
 Script listo en `datasets/train_jugadores.py`. Parámetros objetivo:
-- Base: YOLOv11m
+- Base: YOLOv11m (`yolo11m.pt`, COCO-pretrained)
 - `imgsz=1280`
-- 80-100 epochs
+- 100 epochs
 - Augmentation geométrico agresivo (perspectiva, rotación, shear) para cubrir variaciones de ángulo.
 - Ejecutar en Kaggle con GPU.
 
