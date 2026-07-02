@@ -23,18 +23,11 @@ import {
 } from "@/components/ui/table";
 import type { EvalHistoryEntry, EvalReport } from "@/types/eval";
 
-export const Route = createFileRoute("/metrics")({
-  head: () => ({
-    meta: [
-      { title: "Metrics — Futbol AI" },
-      { name: "description", content: "Evaluación técnica del modelo de keypoints." },
-      { name: "robots", content: "noindex,nofollow" },
-    ],
-  }),
-  component: MetricsPage,
+export const Route = createFileRoute("/metrics/")({
+  component: FieldMetricsPage,
 });
 
-function MetricsPage() {
+function FieldMetricsPage() {
   const [report, setReport] = useState<EvalReport | null>(null);
   const [history, setHistory] = useState<EvalHistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +38,9 @@ function MetricsPage() {
         r.ok ? (r.json() as Promise<EvalReport>) : Promise.reject(new Error(`report ${r.status}`)),
       ),
       fetch("/eval_history.json").then((r) =>
-        r.ok ? (r.json() as Promise<EvalHistoryEntry[]>) : Promise.resolve([] as EvalHistoryEntry[]),
+        r.ok
+          ? (r.json() as Promise<EvalHistoryEntry[]>)
+          : Promise.resolve([] as EvalHistoryEntry[]),
       ),
     ])
       .then(([rep, hist]) => {
@@ -56,26 +51,19 @@ function MetricsPage() {
   }, []);
 
   if (error) {
-    return (
-      <div className="p-6 text-sm text-destructive">
-        No se pudo cargar la evaluación: {error}
-      </div>
-    );
+    return <div className="text-sm text-destructive">No se pudo cargar la evaluación: {error}</div>;
   }
   if (!report) {
-    return <div className="p-6 text-sm text-muted-foreground">Cargando evaluación…</div>;
+    return <div className="text-sm text-muted-foreground">Cargando evaluación…</div>;
   }
 
   return (
-    <div className="flex w-full flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Evaluación del modelo</h1>
-          <p className="text-sm text-muted-foreground">
-            {report.metadata.model} · {report.metadata.n_frames} frames · conf{" "}
-            {report.metadata.conf_threshold} · {fmtDate(report.metadata.timestamp)}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {report.metadata.model} · {report.metadata.n_frames} frames · conf{" "}
+          {report.metadata.conf_threshold} · {fmtDate(report.metadata.timestamp)}
+        </p>
         <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
           {report.metadata.git_commit.short_hash} · {report.metadata.git_commit.message}
         </code>
@@ -146,14 +134,14 @@ function SummaryCards({ report }: { report: EvalReport }) {
     },
     {
       icon:
-        s.homography_failure_rate > 0.2 ? (
+        (s.homography_failure_rate ?? 0) > 0.2 ? (
           <AlertTriangle className="h-4 w-4" />
         ) : (
           <CheckCircle2 className="h-4 w-4" />
         ),
       label: "Fallos homografía",
-      value: pct(s.homography_failure_rate),
-      tone: tonePct(1 - s.homography_failure_rate, 0.7, 0.9),
+      value: s.homography_failure_rate == null ? "—" : pct(s.homography_failure_rate),
+      tone: tonePct(1 - (s.homography_failure_rate ?? 0), 0.7, 0.9),
     },
     {
       icon: <Target className="h-4 w-4" />,
@@ -245,8 +233,8 @@ function PerKeypointChart({ report }: { report: EvalReport }) {
     () =>
       Object.entries(report.per_keypoint).map(([name, k]) => ({
         name,
-        pck10: k.pck_10px * 100,
-        recall: k.recall * 100,
+        pck10: k.pck_10px != null ? k.pck_10px * 100 : null,
+        recall: k.recall != null ? k.recall * 100 : null,
       })),
     [report],
   );
@@ -293,7 +281,8 @@ function PerKeypointChart({ report }: { report: EvalReport }) {
 
 function PerKeypointTable({ report }: { report: EvalReport }) {
   const rows = Object.entries(report.per_keypoint).sort(
-    (a, b) => (b[1].recall ?? 0) - (a[1].recall ?? 0) || (b[1].pck_10px ?? 0) - (a[1].pck_10px ?? 0),
+    (a, b) =>
+      (b[1].recall ?? 0) - (a[1].recall ?? 0) || (b[1].pck_10px ?? 0) - (a[1].pck_10px ?? 0),
   );
   return (
     <div className="overflow-x-auto">
@@ -317,9 +306,15 @@ function PerKeypointTable({ report }: { report: EvalReport }) {
               <TableCell className="text-right">{k.n_gt}</TableCell>
               <TableCell className="text-right">{k.n_detected}</TableCell>
               <TableCell className="text-right">{k.recall == null ? "—" : pct(k.recall)}</TableCell>
-              <TableCell className="text-right">{k.pck_5px == null ? "—" : pct(k.pck_5px)}</TableCell>
-              <TableCell className="text-right">{k.pck_10px == null ? "—" : pct(k.pck_10px)}</TableCell>
-              <TableCell className="text-right">{k.pck_20px == null ? "—" : pct(k.pck_20px)}</TableCell>
+              <TableCell className="text-right">
+                {k.pck_5px == null ? "—" : pct(k.pck_5px)}
+              </TableCell>
+              <TableCell className="text-right">
+                {k.pck_10px == null ? "—" : pct(k.pck_10px)}
+              </TableCell>
+              <TableCell className="text-right">
+                {k.pck_20px == null ? "—" : pct(k.pck_20px)}
+              </TableCell>
               <TableCell className="text-right">
                 {k.mean_error_px == null ? "—" : k.mean_error_px.toFixed(1)}
               </TableCell>

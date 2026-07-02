@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TeamRouteImport } from './routes/team'
 import { Route as RivalsRouteImport } from './routes/rivals'
-import { Route as MetricsRouteImport } from './routes/metrics'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as MetricsRouteRouteImport } from './routes/metrics/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MetricsIndexRouteImport } from './routes/metrics/index'
+import { Route as MetricsBallRouteImport } from './routes/metrics/ball'
 
 const TeamRoute = TeamRouteImport.update({
   id: '/team',
@@ -24,11 +26,6 @@ const TeamRoute = TeamRouteImport.update({
 const RivalsRoute = RivalsRouteImport.update({
   id: '/rivals',
   path: '/rivals',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MetricsRoute = MetricsRouteImport.update({
-  id: '/metrics',
-  path: '/metrics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompareRoute = CompareRouteImport.update({
@@ -41,57 +38,94 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MetricsRouteRoute = MetricsRouteRouteImport.update({
+  id: '/metrics',
+  path: '/metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MetricsIndexRoute = MetricsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MetricsRouteRoute,
+} as any)
+const MetricsBallRoute = MetricsBallRouteImport.update({
+  id: '/ball',
+  path: '/ball',
+  getParentRoute: () => MetricsRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/metrics': typeof MetricsRouteRouteWithChildren
   '/admin': typeof AdminRoute
   '/compare': typeof CompareRoute
-  '/metrics': typeof MetricsRoute
   '/rivals': typeof RivalsRoute
   '/team': typeof TeamRoute
+  '/metrics/ball': typeof MetricsBallRoute
+  '/metrics/': typeof MetricsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/compare': typeof CompareRoute
-  '/metrics': typeof MetricsRoute
   '/rivals': typeof RivalsRoute
   '/team': typeof TeamRoute
+  '/metrics/ball': typeof MetricsBallRoute
+  '/metrics': typeof MetricsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/metrics': typeof MetricsRouteRouteWithChildren
   '/admin': typeof AdminRoute
   '/compare': typeof CompareRoute
-  '/metrics': typeof MetricsRoute
   '/rivals': typeof RivalsRoute
   '/team': typeof TeamRoute
+  '/metrics/ball': typeof MetricsBallRoute
+  '/metrics/': typeof MetricsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/compare' | '/metrics' | '/rivals' | '/team'
+  fullPaths:
+    | '/'
+    | '/metrics'
+    | '/admin'
+    | '/compare'
+    | '/rivals'
+    | '/team'
+    | '/metrics/ball'
+    | '/metrics/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/compare' | '/metrics' | '/rivals' | '/team'
-  id:
-    | '__root__'
+  to:
     | '/'
     | '/admin'
     | '/compare'
-    | '/metrics'
     | '/rivals'
     | '/team'
+    | '/metrics/ball'
+    | '/metrics'
+  id:
+    | '__root__'
+    | '/'
+    | '/metrics'
+    | '/admin'
+    | '/compare'
+    | '/rivals'
+    | '/team'
+    | '/metrics/ball'
+    | '/metrics/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MetricsRouteRoute: typeof MetricsRouteRouteWithChildren
   AdminRoute: typeof AdminRoute
   CompareRoute: typeof CompareRoute
-  MetricsRoute: typeof MetricsRoute
   RivalsRoute: typeof RivalsRoute
   TeamRoute: typeof TeamRoute
 }
@@ -112,13 +146,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RivalsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/metrics': {
-      id: '/metrics'
-      path: '/metrics'
-      fullPath: '/metrics'
-      preLoaderRoute: typeof MetricsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/compare': {
       id: '/compare'
       path: '/compare'
@@ -133,6 +160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/metrics': {
+      id: '/metrics'
+      path: '/metrics'
+      fullPath: '/metrics'
+      preLoaderRoute: typeof MetricsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -140,14 +174,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/metrics/': {
+      id: '/metrics/'
+      path: '/'
+      fullPath: '/metrics/'
+      preLoaderRoute: typeof MetricsIndexRouteImport
+      parentRoute: typeof MetricsRouteRoute
+    }
+    '/metrics/ball': {
+      id: '/metrics/ball'
+      path: '/ball'
+      fullPath: '/metrics/ball'
+      preLoaderRoute: typeof MetricsBallRouteImport
+      parentRoute: typeof MetricsRouteRoute
+    }
   }
 }
 
+interface MetricsRouteRouteChildren {
+  MetricsBallRoute: typeof MetricsBallRoute
+  MetricsIndexRoute: typeof MetricsIndexRoute
+}
+
+const MetricsRouteRouteChildren: MetricsRouteRouteChildren = {
+  MetricsBallRoute: MetricsBallRoute,
+  MetricsIndexRoute: MetricsIndexRoute,
+}
+
+const MetricsRouteRouteWithChildren = MetricsRouteRoute._addFileChildren(
+  MetricsRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MetricsRouteRoute: MetricsRouteRouteWithChildren,
   AdminRoute: AdminRoute,
   CompareRoute: CompareRoute,
-  MetricsRoute: MetricsRoute,
   RivalsRoute: RivalsRoute,
   TeamRoute: TeamRoute,
 }
