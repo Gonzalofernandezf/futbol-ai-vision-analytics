@@ -234,6 +234,7 @@ function ProblemFramesTable({ report }: { report: EvalBallReport }) {
         .sort((a, b) => (a.outcome === b.outcome ? 0 : a.outcome === "FP" ? -1 : 1)),
     [report],
   );
+  const okCount = report.per_frame.length - rows.length;
 
   if (rows.length === 0) {
     return (
@@ -244,37 +245,43 @@ function ProblemFramesTable({ report }: { report: EvalBallReport }) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Frame</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead className="text-right">Confianza</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((f: EvalBallPerFrame) => (
-            <TableRow key={f.filename}>
-              <TableCell className="font-mono text-xs">{f.filename}</TableCell>
-              <TableCell>
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                    f.outcome === "FP"
-                      ? "bg-red-500/15 text-red-400"
-                      : "bg-amber-500/15 text-amber-400"
-                  }`}
-                >
-                  {f.outcome === "FP" ? "Falso positivo" : "Falso negativo"}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                {f.confidence == null ? "—" : f.confidence.toFixed(2)}
-              </TableCell>
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">
+        Mostrando solo los {rows.length} frames con error, de {report.per_frame.length} evaluados en
+        total ({okCount} correctos — aciertos o "sin balón" bien detectados — no se listan acá).
+      </p>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Frame</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead className="text-right">Confianza</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {rows.map((f: EvalBallPerFrame) => (
+              <TableRow key={f.filename}>
+                <TableCell className="font-mono text-xs">{f.filename}</TableCell>
+                <TableCell>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                      f.outcome === "FP"
+                        ? "bg-red-500/15 text-red-400"
+                        : "bg-amber-500/15 text-amber-400"
+                    }`}
+                  >
+                    {f.outcome === "FP" ? "Falso positivo" : "Falso negativo"}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  {f.confidence == null ? "—" : f.confidence.toFixed(2)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
