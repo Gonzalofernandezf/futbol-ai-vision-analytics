@@ -18,7 +18,7 @@
 | — | Reentrenamiento `modelo_balon.pt` | ✅ Completo |
 | — | Reentrenamiento `modelo_cancha.pt` | ✅ Completo (PCK@5px 93%, error homografía 5.5m) |
 | — | Heatmaps precisos por jugador | ✅ Completo (desbloqueado por nuevo modelo_cancha) |
-| T2 | Cross-chunk ReID | ✅ Completo (código). Pendiente validar contra un partido completo real por chunks en Kaggle. |
+| T2 | Cross-chunk ReID | ✅ Completo (código). Pendiente validar contra footage real por chunks en Kaggle — corregido 2026-07-03: no hace falta el partido completo, ver detalle en la sección T2. |
 | T3 | Reentrenamiento `best_100e.pt` (cámara baja) | ✅ Completo — `best_jugadores_v2.pt` validado sobre `video_OG.mp4` (footage real de Dinamó, cámara 3-4m): mAP50 0.983, id_churn_ratio 3.24→2.46. Fallback a `best_100e.pt` por 1-2 semanas de uso real. |
 | — | Análisis de balón parado | ✅ Completo (backend + dashboard). Pendiente validar detección contra `video_OG.mp4` real. |
 
@@ -152,7 +152,8 @@ Script listo en `datasets/train_jugadores.py`. Parámetros objetivo:
 
 **Validación:**
 - Probado end-to-end con datos sintéticos (`ChunkBridge` + `_merge_chunks`): con IDs locales reseteados entre chunks, el merge produce el número correcto de jugadores globales, con `position_history`/distancia acumulados bien.
-- 🔲 **Pendiente:** correr sobre un partido completo real en Kaggle con `run_chunked.py` y comparar `match_unique_player_ids`/`id_churn_ratio` antes/después — no se puede probar en este entorno de desarrollo (sin GPU ni `ultralytics` instalado). Objetivo original del plan: para un partido de 90 min, idealmente ≤30 IDs únicos globales.
+- 🔲 **Pendiente:** correr sobre footage real por chunks en Kaggle con `run_chunked.py` y comparar `match_unique_player_ids`/`id_churn_ratio` antes/después — no se puede probar en este entorno de desarrollo (sin GPU ni `ultralytics` instalado).
+- **Corrección 2026-07-03 — no hace falta el partido completo:** el objetivo original de este plan ("para un partido de 90 min, idealmente ≤30 IDs únicos globales") se leyó erróneamente como "hay que procesar el partido completo para validar T2". A día de hoy, un partido completo por `run_chunked.py` (pipeline completo de `Main.py` por chunk: jugadores + balón + homografía + velocidad + render) tarda más de 30 horas — inviable en una sesión de Kaggle. Pero lo que T2 necesita probar es si `ChunkBridge` reconcilia bien IDs **en una frontera real entre chunks**, no la duración total: si el mecanismo funciona correctamente en 4-5 fronteras reales consecutivas, es evidencia suficiente de que generaliza al resto del partido, porque se aplica de forma idéntica e independiente en cada frontera. Validación acotada y suficiente: un tramo de ~12-15 min de `video_OG.mp4` (con mezcla de juego abierto y algo de aglomeración, igual que se hizo para el ablation de `BOTSORT_TRACK_BUFFER`), `CHUNK_DURATION_MIN=3` (→ 4-5 chunks reales) y `SKIP_VIDEO_OUTPUT=true` para no pagar el coste de renderizar vídeo anotado por cada chunk. Objetivo de la métrica: `id_churn_ratio` se mantiene igual de sano en las fronteras que dentro de un chunk — no un número absoluto de IDs, que solo tiene sentido sobre el partido completo.
 
 **Esfuerzo real:** ~1 sesión.
 **Riesgo:** medio — la dependencia de API interna de `ultralytics` es el riesgo principal a mediano plazo (mitigado con fallback automático); el ajuste fino de pesos/umbrales de la matriz de costes necesita, como con T3 y balón parado, una validación con datos reales antes de confiar en los números.
@@ -204,7 +205,7 @@ Script listo en `datasets/train_jugadores.py`. Parámetros objetivo:
 |-------|------|--------|
 | ~~1~~ | ~~T3 — Reentrenar `best_100e.pt`~~ | ✅ Completo. |
 | ~~2~~ | ~~Balón parado (MVP rule-based)~~ | ✅ Completo (backend + dashboard). Pendiente validar contra `video_OG.mp4` real. |
-| ~~3~~ | ~~T2 — Cross-chunk ReID~~ | ✅ Completo (código). Pendiente validar con un partido completo por chunks en Kaggle. |
+| ~~3~~ | ~~T2 — Cross-chunk ReID~~ | ✅ Completo (código). Pendiente validar con footage real por chunks en Kaggle (acotado a ~12-15 min, no el partido completo — ver corrección 2026-07-03 en la sección T2). |
 
 Los tres tiers priorizados del plan están implementados. Pendiente: validación con datos reales de los tres (Kaggle) antes de darlos por cerrados en producción.
 
@@ -271,7 +272,7 @@ Ver la tabla de corrección en la sección T4 arriba para el diagnóstico comple
 
 **Por qué es la prioridad más alta con esfuerzo relativamente bajo:** toda la infraestructura pesada ya existe de T2 — extracción de embeddings (`Tracker.get_track_embeddings()`), matriz de costes con restricción dura de equipo, Hungarian assignment vía `scipy.optimize.linear_sum_assignment`. No es un área nueva, es la extensión natural de un Tier ya cerrado. El propio research la señala como la mejora de mayor impacto de las cinco áreas, precisamente porque reutiliza señales que un pipeline con ReID ya calcula, sin tocar los detectores online.
 
-**Dependencia con la validación pendiente de T2:** T2 todavía tiene pendiente correr sobre un partido completo real en Kaggle vía `run_chunked.py` (ver tabla de estado al inicio del documento). Conviene bundlear T8 con esa misma validación — evita dos ciclos de Kaggle separados y permite medir `id_churn_ratio` con y sin el splitter/connector generalizado en la misma corrida.
+**Dependencia con la validación pendiente de T2:** T2 todavía tiene pendiente correr sobre footage real por chunks en Kaggle vía `run_chunked.py` (ver tabla de estado al inicio del documento). **Corrección 2026-07-03:** no hace falta un partido completo para esto — un partido completo por `run_chunked.py` (pipeline completo de `Main.py` por chunk) tarda hoy más de 30 horas, inviable en una sesión de Kaggle. Lo que T2/T8 necesitan probar es si la reconciliación funciona en fronteras reales entre chunks, no la duración total: un tramo acotado de ~12-15 min (`CHUNK_DURATION_MIN=3` → 4-5 chunks reales, `SKIP_VIDEO_OUTPUT=true` para no pagar el render) ya ejercita el mecanismo de forma representativa. Conviene bundlear T8 con esa misma validación acotada — evita dos ciclos de Kaggle separados y permite medir `id_churn_ratio` con y sin el splitter/connector generalizado en la misma corrida.
 
 **✅ `BOTSORT_TRACK_BUFFER`: ablation completado 2026-07-03, bajado de 200 a 100 — resuelto independientemente de T8**
 
@@ -314,7 +315,7 @@ Lectura: el salto real está entre 10 y 100 (10 rompe el objetivo ≤3.0 en el c
 | 1 | T6 — Suavizado Savitzky-Golay del balón | ~1 día | Quick win puro, cero dependencias nuevas, mejora balón parado y dashboard a la vez |
 | 2 | T7 (Opción A) — Team assignment: césped por HSV real + re-cluster periódico + voto deslizante + portero aparte | 1-2 días | Corrige una brecha real entre lo documentado y lo implementado; visible en cualquier demo con cambios de luz |
 | ~~3~~ | ~~Retune de `BOTSORT_TRACK_BUFFER` (parte de T8)~~ | ✅ Completo 2026-07-03 — bajado de 200 a 100, ver detalle en T8 | Desacoplado de T8: no hizo falta esperar al Splitter/Connector, se validó solo con dos clips reales |
-| 3 | T8 — Asociación global de tracklets (Splitter DBSCAN + Connector generalizado) | 2-3 días, bundleado con la validación pendiente de T2 en Kaggle | Mayor impacto de calidad de las 5 áreas del research; reutiliza infraestructura ya construida en T2 |
+| 3 | T8 — Asociación global de tracklets (Splitter DBSCAN + Connector generalizado) | 2-3 días, bundleado con la validación pendiente de T2 en Kaggle sobre un tramo acotado (~12-15 min, no partido completo — ver corrección 2026-07-03) | Mayor impacto de calidad de las 5 áreas del research; reutiliza infraestructura ya construida en T2 |
 | — | T7 (Opción B, SigLIP) | Solo si T7-A no resuelve casos reales de color ambiguo, con evidencia concreta | Evitar over-engineering sin evidencia, mismo criterio que T3 |
 | Defer | PnLCalib completo, T-DEED, y el resto de la tabla "Qué NO hacer" | — | ROI insuficiente para 2 personas en este ciclo |
 
