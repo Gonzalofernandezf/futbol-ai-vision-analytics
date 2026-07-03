@@ -8,11 +8,15 @@ Uso:
     VIDEO_PATH=... MODEL_PATH=... python debug_player_detection.py
 
 Respeta las mismas env vars que Main.py para esto: VIDEO_PATH, MODEL_PATH,
-VIDEO_START_SEC/VIDEO_END_SEC, OUTPUT_DIR, YOLO_DEVICE_TRACKER, FRAME_SCALE.
+VIDEO_START_SEC/VIDEO_END_SEC, OUTPUT_DIR, YOLO_DEVICE_TRACKER, FRAME_SCALE,
+SKIP_VIDEO_OUTPUT.
 
 Salida: <OUTPUT_DIR>/debug_players_<fecha>_vN.mp4 (sin JSON, sin deploy a
 DEMO_DIR — es una herramienta de depuración visual, no parte del pipeline
-de producción).
+de producción). Con SKIP_VIDEO_OUTPUT=true no se renderiza nada — solo se
+imprimen las métricas de tracking (útil para ablations rápidos de
+parámetros, p.ej. comparar BOTSORT_TRACK_BUFFER, donde el vídeo no aporta
+nada y cuesta tiempo de Kaggle).
 """
 import os
 from datetime import datetime
@@ -40,9 +44,6 @@ def get_output_path(output_dir, base_name="debug_players"):
 def main():
     video_path = config.VIDEO_PATH
     model_path = config.MODEL_PATH
-    output_path = get_output_path(config.OUTPUT_DIR)
-
-    print(f"📁 Video de salida: {output_path}")
 
     segments = [(config.VIDEO_START_SEC, config.VIDEO_END_SEC)] if config.VIDEO_END_SEC is not None else None
     video_frames, fps = read_video(video_path, segments=segments)
@@ -74,19 +75,24 @@ def main():
                 tracks['players'][frame_num][player_id]['team'] = team_winner
                 tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team_winner]
 
-    print("🎨 Renderizando vídeo (streaming)...")
-    h, w = video_frames[0].shape[:2]
-    fourcc = cv2.VideoWriter_fourcc(*config.VIDEO_CODEC)
-    writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+    if config.SKIP_VIDEO_OUTPUT:
+        print("⏭️  SKIP_VIDEO_OUTPUT=true — saltando el render, solo métricas.")
+    else:
+        output_path = get_output_path(config.OUTPUT_DIR)
+        print(f"📁 Video de salida: {output_path}")
+        print("🎨 Renderizando vídeo (streaming)...")
+        h, w = video_frames[0].shape[:2]
+        fourcc = cv2.VideoWriter_fourcc(*config.VIDEO_CODEC)
+        writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
-    for frame_num, orig_frame in enumerate(video_frames):
-        frame = tracker.draw_annotations_frame(orig_frame.copy(), frame_num, tracks)
-        writer.write(frame)
-        if frame_num % 500 == 0:
-            print(f"  ✍️  {frame_num}/{len(video_frames)} frames renderizados...")
+        for frame_num, orig_frame in enumerate(video_frames):
+            frame = tracker.draw_annotations_frame(orig_frame.copy(), frame_num, tracks)
+            writer.write(frame)
+            if frame_num % 500 == 0:
+                print(f"  ✍️  {frame_num}/{len(video_frames)} frames renderizados...")
 
-    writer.release()
-    print(f"✅ Vídeo guardado en {output_path}")
+        writer.release()
+        print(f"✅ Vídeo guardado en {output_path}")
 
     metrics = tracking_metrics(tracks, fps)
     print("📊 TRACKING METRICS")
