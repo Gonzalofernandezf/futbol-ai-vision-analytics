@@ -14,6 +14,7 @@ from view_transformer.view_transformer import ViewTransformer
 from speed_and_distance_estimator.speed_and_distance_estimator import SpeedAndDistance_Estimator
 from data_exporter.data_exporter import GameStatsExporter
 from analytics.set_piece_detector import detect_set_pieces
+from Trackers.cross_chunk_reid import build_chunk_state
 import shutil
 import config
 
@@ -143,6 +144,12 @@ def main():
                 video_frames, read_from_stub=False,
                 stub_path='stubs/camera_movement_stub.pkl',
             )
+
+    # Cross-chunk ReID (Tier 2): snapshot de embeddings de apariencia justo al
+    # terminar el tracking, para poder reconciliar IDs entre chunks en
+    # run_chunked.py. Defensivo — si falla, sigue el run sin cross-chunk ReID.
+    # Ver Trackers/cross_chunk_reid.py.
+    track_embeddings = tracker.get_track_embeddings()
 
     # Merge ball tracks (from the dedicated detector) into the main tracks dict.
     # tracker.get_object_tracks left tracks["ball"] as a list of empty {} so
@@ -294,6 +301,18 @@ def main():
                 if player_id in tracks['players'][frame_num]:
                     tracks['players'][frame_num][player_id]['team'] = team_winner
                     tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team_winner]
+
+    # Cross-chunk ReID (Tier 2): guarda el estado de este chunk (equipo,
+    # posición inicial/final, embedding de apariencia por track) para que
+    # run_chunked.py pueda reconciliar IDs entre chunks al fusionar. Se
+    # escribe en el OUTPUT_DIR de este chunk (no en un stubs/ compartido) para
+    # que chunks corriendo en paralelo no colisionen entre sí.
+    import pickle as _pickle_cs
+    chunk_state = build_chunk_state(tracks, track_embeddings)
+    chunk_state_path = os.path.join(output_dir, 'chunk_state.pkl')
+    with open(chunk_state_path, 'wb') as f:
+        _pickle_cs.dump(chunk_state, f)
+    print(f" 🔗  Cross-chunk ReID: estado de {len(chunk_state)} tracks guardado en {chunk_state_path}")
 
     # 8. Assign Ball possession
     player_assigner = PlayerBallAssigner()
