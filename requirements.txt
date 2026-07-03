@@ -9,3 +9,4 @@ python-dotenv==1.0.0
 PyYAML>=6.0
 lap>=0.5.12
 roboflow>=1.1.0  # datasets/download_datasets.py (Tier 3 — dataset fine-tuning best_100e.pt)
+scipy>=1.10.0  # Trackers/cross_chunk_reid.py (Tier 2 — Hungarian assignment)

@@ -113,6 +113,20 @@ BOTSORT_WITH_REID         = os.getenv("BOTSORT_WITH_REID", "true").lower() == "t
 BOTSORT_GMC_METHOD        = os.getenv("BOTSORT_GMC_METHOD", "sparseOptFlow")
 BOTSORT_REID_MODEL        = os.getenv("BOTSORT_REID_MODEL", "auto")
 
+# Cross-chunk ReID (Tier 2) — Trackers/cross_chunk_reid.py. Pesos de la matriz de
+# costes del Hungarian assignment entre tracks del final de un chunk y el inicio
+# del siguiente. appearance_weight + spatial_weight no necesitan sumar 1, son
+# pesos relativos, no una combinación convexa.
+CROSS_CHUNK_APPEARANCE_WEIGHT = float(os.getenv("CROSS_CHUNK_APPEARANCE_WEIGHT", "0.6"))
+CROSS_CHUNK_SPATIAL_WEIGHT    = float(os.getenv("CROSS_CHUNK_SPATIAL_WEIGHT",    "0.4"))
+# Distancia espacial (metros) por encima de la cual dos tracks nunca se consideran
+# el mismo jugador, sin importar cuánto se parezcan — evita que el Hungarian fuerce
+# un match absurdo solo porque era "el menos malo" de la matriz.
+CROSS_CHUNK_MAX_SPATIAL_M     = float(os.getenv("CROSS_CHUNK_MAX_SPATIAL_M",     "15.0"))
+# Coste total (ya ponderado) por encima del cual se descarta el match aunque el
+# Hungarian lo haya emparejado — el par queda como IDs sin relacionar.
+CROSS_CHUNK_MAX_COST          = float(os.getenv("CROSS_CHUNK_MAX_COST",          "0.7"))
+
 # Crowd / stands mask: ignore detections whose top-Y is above this many pixels
 CROWD_MASK_Y_PX     = int  (os.getenv("CROWD_MASK_Y_PX",     "80"))
 
