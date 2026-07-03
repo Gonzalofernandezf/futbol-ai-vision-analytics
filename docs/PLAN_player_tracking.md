@@ -196,6 +196,28 @@ Los tres tiers priorizados del plan están implementados. Pendiente: validación
 
 ---
 
+## Ideas futuras (sin comprometer, evaluar antes de construir)
+
+### 🔲 Reconocimiento de dorsal (número de camiseta) como señal adicional de identidad
+
+Surgió al cerrar T2: la debilidad real del matching por apariencia (embeddings ReID de BoT-SORT) es que, **dentro del mismo equipo**, dos jugadores con camiseta idéntica y contextura similar generan embeddings parecidos — el color de camiseta domina la señal, justo donde el equipo ya es una restricción dura y no aporta más discriminación. El dorsal, cuando es legible, es casi determinístico y resolvería exactamente ese caso.
+
+Encajaría en dos sitios sin rediseñar lo ya construido:
+- `Trackers/cross_chunk_reid.py::ChunkBridge._match_pair` — como un término más de coste (o incluso restricción dura si el número es legible con alta confianza en ambos extremos), análogo al de equipo.
+- Dentro de un mismo chunk, como voto mayoritario por track (mismo patrón que `TeamAssigner` ya usa para el equipo en `Main.py`), para reducir *ID switches* por oclusión.
+
+También tiene valor de producto más allá del tracking: si es fiable, permitiría mostrar "Jugador #10" con su dorsal real en vez de un ID de track arbitrario.
+
+**Por qué no se aborda ahora:**
+- Es un sub-problema de visión nuevo (detección/OCR de dígitos sobre camiseta), no un ajuste — necesitaría su propio modelo/dataset, con un esfuerzo comparable al reentrenamiento de T3.
+- El dorsal solo es legible cuando el jugador da la espalda a cámara; en **cámara baja/lateral** (el caso prioritario de este proyecto) es razonable esperar que se vea legible con menos frecuencia que desde tribuna alta — sin validar esto contra footage real de Dinamó, no hay forma de saber si el esfuerzo se justifica.
+- Añade otro modelo corriendo por frame, compitiendo por VRAM/tiempo de inferencia con los que ya hay (jugadores, balón, campo).
+- No sustituye la apariencia+posición ya construidas, solo las complementaría en los frames donde el número es legible.
+
+**Antes de comprometer esfuerzo:** revisar a ojo unos minutos de `video_OG.mp4` real y contar en cuántos frames el dorsal es efectivamente legible desde la cámara de Dinamó. Si es raro, no se justifica. Si aparece con frecuencia razonable, documentarlo como un Tier nuevo con diseño propio.
+
+---
+
 ## Lo que este plan NO incluye (a propósito)
 
 - Análisis táctico (formaciones, pressing, líneas defensivas) — fuera de scope.
