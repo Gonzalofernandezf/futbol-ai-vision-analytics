@@ -2,6 +2,8 @@
 
 **Contexto:** después de fix del bug de balón + integración del nuevo modelo de balón, el detector de jugadores y la persistencia de tracking quedaban como cuello de botella principal. Este documento recoge el plan original y su estado de ejecución actualizado a 2026-07-02.
 
+**Actualización 2026-07-03:** se incorpora la auditoría de un deep research externo (Gemini) sobre el estado del arte 2023-2025 en visión por computador para fútbol, encargado con una restricción explícita de ROI para equipo de 2 personas. Ver sección "Roadmap 2026" más abajo — incluye una corrección importante al estado de Tier 4 (team assignment), encontrada al verificar el research contra el código real.
+
 **Regla general:** un PR por Tier. Antes/después medible con `utils/perf_monitor.py`.
 
 ---
@@ -12,7 +14,7 @@
 |------|-------------|--------|
 | T0 + T5 | Quick wins de configuración + observabilidad | ✅ Completo |
 | T1 | Migración ByteTrack → BoT-SORT con ReID | ✅ Completo |
-| T4 | Team assignment robusto | ✅ Completo |
+| T4 | Team assignment robusto | ⚠️ Completo solo parcialmente — la descripción original no coincide con el código real. Ver corrección 2026-07-03 en la sección T4 y T7 en "Roadmap 2026" |
 | — | Reentrenamiento `modelo_balon.pt` | ✅ Completo |
 | — | Reentrenamiento `modelo_cancha.pt` | ✅ Completo (PCK@5px 93%, error homografía 5.5m) |
 | — | Heatmaps precisos por jugador | ✅ Completo (desbloqueado por nuevo modelo_cancha) |
@@ -47,12 +49,24 @@ Migración de `supervision.ByteTrack` a BoT-SORT con ReID vía `ultralytics.YOLO
 - Config en `Trackers/botsort.yaml`.
 - `get_object_tracks` adaptado para consumir `Boxes.id` directamente.
 
-### ✅ Tier 4 — Team assignment robusto
+### ⚠️ Tier 4 — Team assignment robusto (corrección 2026-07-03: descripción original no coincide con el código)
 
+Descripción original de este plan (nunca verificada línea a línea contra el código hasta ahora):
 - Segmentación HSV para descartar césped y fondo antes del clustering.
 - Re-cluster periódico (resiste cambios de iluminación y sombras).
 - Votación móvil por ID en vez de cacheo permanente.
 - Portero tratado como clase separada (no contamina los clusters de equipo).
+
+**Lo que realmente hay en el código**, verificado al auditar el pipeline contra el deep research externo (ver "Roadmap 2026" más abajo):
+
+| Garantía descrita | Código real |
+|---|---|
+| Segmentación HSV para descartar césped | No existe. `team_assigner.py::get_player_color` solo recorta el 60% central del ancho y la mitad superior del bbox — un recorte geométrico fijo, no una máscara de color |
+| Re-cluster periódico | No existe. `self.kmeans` se entrena una única vez en `assign_team_color`, llamado solo con el frame 0 del vídeo (`Main.py:260`), y nunca se vuelve a entrenar durante el resto del partido |
+| Votación móvil por ID | Existe un voto (`Main.py:281-303`), pero es un voto **global de todo el partido calculado una sola vez al final**, no una ventana deslizante que se adapte a lo largo del partido |
+| Portero como clase separada | No existe. `Trackers/tracker.py:166-167` remapea `goalkeeper → player` antes de que el team assigner lo vea; el portero entra en el mismo clustering de camiseta que el resto de jugadores |
+
+Es decir: T4 nunca llegó a implementar el diseño robusto que este plan describía — lo que hay hoy es la versión más simple posible (crop de color + K-Means fijo desde frame 0 + voto global al cierre), con exactamente las debilidades (sombras, iluminación cambiante, portero contaminando el clustering) que el diseño original decía haber resuelto. Plan de corrección con dos opciones en el Tier T7 de "Roadmap 2026".
 
 ### ✅ Modelo de campo reentrenado (`modelo_cancha.pt`)
 
@@ -196,6 +210,102 @@ Los tres tiers priorizados del plan están implementados. Pendiente: validación
 
 ---
 
+## Roadmap 2026 — auditoría del deep research externo (Gemini, 2026-07-03)
+
+**Origen:** Gonzalo encargó a Gemini un deep research sobre el estado del arte 2023-2025 en visión por computador para fútbol, con un prompt explícitamente acotado a ROI: no "qué existe en el estado del arte" sino "dado lo que ya tenemos funcionando (cancha y balón ya reentrenados con buenos resultados, cámara fija no-broadcast, GPU consumer, equipo de 2 personas), qué mejoras se justifican". El documento cubre 5 áreas — calibración de campo, tracking/ReID, team assignment, detección de balón, balón parado — y cierra con una matriz de prioridad ROI.
+
+Lo que sigue no es una transcripción de esa matriz: es la contrastación de cada recomendación contra el código real del repo (verificado archivo por archivo, no contra lo que este plan *decía* que había — ver la corrección de T4 arriba, que es exactamente el tipo de desajuste que esta auditoría buscaba evitar en el resto del roadmap).
+
+### Tabla resumen por área
+
+| Área del research | Recomendación | Estado real en nuestro código (auditado 2026-07-03) | Veredicto |
+|---|---|---|---|
+| 1. Calibración de campo (PnLCalib) | Adoptar pipeline completo de optimización 3D puntos+líneas | `view_transformer.py` ya reentrenado (`modelo_cancha.pt`, PCK@5px 92.8%, error homográfico 5.5m), con RANSAC + fallback a última matriz válida. Recalcula la homografía completa por frame; no aprovecha que la cámara es fija (K y posición constantes durante todo el partido) | Postergar adopción completa — coincide con la propia conclusión del research. Evaluar una versión mínima aparte (ver "Ideas futuras") |
+| 2. Tracking/ReID (GTATrack: Deep-EIoU + GTA-Link) | Asociación global de tracklets: grafo con splitter (DBSCAN) + connector (Hungarian) | T2 ya implementa Hungarian + apariencia (embeddings OSNet de BoT-SORT) + posición + equipo como restricción dura — pero **solo en la frontera entre chunks consecutivos** (`Trackers/cross_chunk_reid.py::ChunkBridge._match_pair`). No existe splitter ni reconciliación de tracklets fragmentados dentro de un mismo chunk. Además, `BOTSORT_TRACK_BUFFER=200` (`config.py:111`, `Trackers/botsort.yaml:5`, ~6.7s a 30fps) supera el umbral que el propio research señala como zona de "deriva fantasma" (>150 frames) | Extender T2 a asociación global — mayor impacto de las 5 áreas, esfuerzo incremental bajo porque reutiliza infraestructura ya construida |
+| 3. Team assignment (SigLIP + UMAP + K-Means) | Sustituir histogramas/color HSV por embeddings contrastivos congelados | Ver corrección de T4 arriba: el código real es más frágil de lo que el plan describía (sin máscara de césped, sin re-cluster, portero contaminando el clustering) | Corregirlo es más urgente de lo que el research por sí solo sugeriría, porque no partimos del baseline robusto que creíamos tener |
+| 4. Balón: interpolación + suavizado cinemático | Interpolación de huecos cortos + filtro Savitzky-Golay | La interpolación de huecos **ya existe** (`Trackers/tracker.py::interpolate_ball_positions`, lineal, `BALL_INTERP_LIMIT=10` frames). El suavizado Savitzky-Golay **no existe**: `speed_over_time` del balón se calcula como derivada frame-a-frame cruda sobre la posición ya interpolada y filtrada (`data_exporter/data_exporter.py::_export_ball`), sin ningún filtro de ruido posterior | Añadir solo el suavizado — quick win real y acotado, no duplica lo ya construido |
+| 5. Balón parado (heurísticas + T-DEED opcional) | Filtro heurístico espaciotemporal como primario; T-DEED solo si sobra tiempo | Heurísticas ya implementadas (`analytics/set_piece_detector.py`), pendiente de validar contra `video_OG.mp4` real. T-DEED nunca se planteó ni se necesitó | Confirma que el enfoque ya tomado fue el correcto. No implementar T-DEED |
+
+### Nuevos tiers propuestos
+
+#### 🔲 T6 — Suavizado cinemático del balón (Savitzky-Golay)
+
+**Objetivo:** reducir el ruido de `speed_over_time` del balón. Hoy se calcula como derivada frame-a-frame cruda sobre `position_transformed` (`data_exporter/data_exporter.py::_export_ball`, líneas 59-64), sin ningún filtro tras la interpolación de huecos. Esto afecta: (a) la fiabilidad de `SET_PIECE_STATIONARY_KMH`/`SET_PIECE_STATIONARY_SEC` en `analytics/set_piece_detector.py` — un pico de ruido puntual puede romper una ventana de "balón inmóvil" y perder una falta/tiro libre real; (b) la curva de velocidad del balón que ve el usuario en el dashboard; (c) indirectamente, la suavidad de la trayectoria dibujada en heatmap/minimapa.
+
+**Qué añadir:** `scipy.signal.savgol_filter` sobre `position_history` del balón, aplicado después de `filter_ball_positions_by_speed` y antes de calcular `speed_over_time` en el exportador. Ventana 13-23 frames, orden polinomial 2 (valores de referencia del research; validar el óptimo contra `video_OG.mp4`, igual que se hizo con los demás umbrales del proyecto). No tocar `BALL_INTERP_LIMIT` — el research advierte contra alargar huecos interpolados linealmente más allá de ~3-5 frames, no contra suavizar la trayectoria ya interpolada.
+
+**Esfuerzo:** ~1 día. Cero dependencias nuevas — `scipy>=1.10.0` ya está en `requirements.txt` desde T2.
+**Riesgo:** muy bajo — post-procesado matemático puro sobre datos ya filtrados; no toca detección ni tracking.
+
+---
+
+#### 🔲 T7 — Team assignment: cerrar la brecha real (dos opciones, decidir antes de implementar)
+
+Ver la tabla de corrección en la sección T4 arriba para el diagnóstico completo. Resumen: sin máscara de césped, sin re-cluster tras frame 0, voto global de todo el partido en vez de ventana deslizante, y portero contaminando el clustering de equipo porque se remapea a `player` (`Trackers/tracker.py:166-167`) antes de llegar al team assigner.
+
+**Opción A — Arreglar dentro del paradigma actual (HSV + K-Means), esfuerzo bajo:**
+- Enmascarar césped por rango HSV antes de recortar el jersey, en vez de confiar solo en el recorte geométrico centrado.
+- Re-clusterizar periódicamente (cada N segundos) en vez de una sola vez en frame 0.
+- Convertir el voto global de `Main.py:281-303` en una ventana deslizante real (últimos K segundos), para que el sistema se adapte si la iluminación cambia a mitad de partido.
+- Excluir al portero del clustering de equipo (usar la clase original antes del remapeo) y asignarle equipo por proximidad/posición en vez de por color.
+- Esfuerzo: 1-2 días. Cero dependencias nuevas.
+
+**Opción B — Saltar directo a embeddings SigLIP/CLIP + K-Means (recomendación del research):**
+- Sustituir la extracción de color (`get_player_color`) por un encoder congelado (SigLIP o CLIP), reportado como inmune a sombras duras, patrocinadores y reflectancia de lluvia — justo donde el color puro falla.
+- Reutilizar la lógica de equipo/voto ya existente; solo cambia el paso de extracción de features.
+- Coste según el research: <1.5GB VRAM en batch, milisegundos en CPU para K-Means sobre embeddings reducidos. Requiere una dependencia nueva y pesada (`transformers` u `open_clip` — evaluar cuál es más liviano), que hay que justificar explícitamente en el PR (regla de la sección 7 de este CLAUDE.md).
+- Esfuerzo: 2-3 días, incluyendo validar que el modelo elegido corre bien offline en RTX 3070/4070 sin romper el procesamiento por lotes actual.
+
+**Recomendación tech lead:** empezar por la Opción A. Resuelve la mayor parte del problema real (césped, portero, adaptación temporal) sin dependencias nuevas y es barata de revertir. Si tras validarla contra `video_OG.mp4` persisten fallos sistemáticos de color (uniformes muy parecidos entre sí, sombras extremas), la Opción B se justifica con evidencia concreta en mano — mismo criterio que se usó en T3 para decidir si hacía falta una segunda iteración con etiquetado propio.
+
+**Riesgo:** bajo (Opción A) / medio (Opción B, por la dependencia nueva).
+
+---
+
+#### 🔲 T8 — Asociación global de tracklets (extender T2 más allá de fronteras de chunk)
+
+**Objetivo:** generalizar `Trackers/cross_chunk_reid.py::ChunkBridge` — hoy solo reconcilia IDs en la frontera entre chunks consecutivos — a una asociación global estilo GTA-Link: tratar todos los tracklets del partido (dentro de un chunk y entre chunks) como nodos de un grafo:
+
+1. **Splitter (pieza nueva):** detectar tracklets que mezclan dos identidades por oclusión física estrecha dentro de un mismo chunk. Hoy no existe ningún mecanismo para esto — si BoT-SORT confunde o fragmenta un track en mitad de un chunk, nada lo corrige después. El research usa DBSCAN sobre embeddings de apariencia para detectar el punto de colisión y cortar el tracklet ahí.
+2. **Connector (extensión de lo ya construido):** el Hungarian matching que ya existe en `ChunkBridge._match_pair` (apariencia coseno + posición + equipo como restricción dura) generalizado para operar sobre **todos** los tracklets del partido dentro de una ventana temporal+espacial, no solo el par (fin de chunk N, inicio de chunk N+1).
+
+**Por qué es la prioridad más alta con esfuerzo relativamente bajo:** toda la infraestructura pesada ya existe de T2 — extracción de embeddings (`Tracker.get_track_embeddings()`), matriz de costes con restricción dura de equipo, Hungarian assignment vía `scipy.optimize.linear_sum_assignment`. No es un área nueva, es la extensión natural de un Tier ya cerrado. El propio research la señala como la mejora de mayor impacto de las cinco áreas, precisamente porque reutiliza señales que un pipeline con ReID ya calcula, sin tocar los detectores online.
+
+**Dependencia con la validación pendiente de T2:** T2 todavía tiene pendiente correr sobre un partido completo real en Kaggle vía `run_chunked.py` (ver tabla de estado al inicio del documento). Conviene bundlear T8 con esa misma validación — evita dos ciclos de Kaggle separados y permite medir `id_churn_ratio` con y sin el splitter/connector generalizado en la misma corrida.
+
+**Relacionado — revisar `BOTSORT_TRACK_BUFFER`:** el research advierte explícitamente contra subir el buffer de persistencia del tracker online como forma de "aguantar" oclusiones largas (mantener una predicción activa >150 frames sin detección física genera "derivas fantasma": el tracker asigna identidades de jugadores activos a trayectorias lineales erráticas). Nuestro `BOTSORT_TRACK_BUFFER=200` ya está en esa zona de riesgo. Con T8 implementado, la recuperación de oclusiones largas pasa a resolverse offline (apariencia + grafo) en vez de online (Kalman + buffer largo) — tiene sentido probar a bajar el buffer (100-150) y dejar que T8 recupere lo que el tracker online ya no intenta sostener por sí solo. Validar ambos cambios juntos contra el mismo partido de Kaggle, no por separado.
+
+**Esfuerzo:** 2-3 días (el Connector es extender código existente; el Splitter con DBSCAN es la pieza nueva).
+**Riesgo:** medio — mismo riesgo ya documentado en T2 (dependencia de API interna de `ultralytics` para embeddings, ya mitigado con fallback automático). El Splitter añade una heurística nueva (umbral de DBSCAN) que necesita validación empírica, como todos los umbrales de este proyecto.
+
+---
+
+### Qué NO hacer (confirmado por el research + auditoría propia)
+
+| Técnica | Por qué no | Fuente |
+|---|---|---|
+| PnLCalib completo (recalibración 3D punto+línea) | Nuestro error de homografía ya es 5.5m, suficiente para el caso de uso actual. Reescribir el pipeline de homografía consume semanas que no compensan una mejora marginal sobre un sistema ya considerado estable. Reevaluar solo si el cliente reporta problemas de precisión concretos trazables a la homografía | Research (defer explícito) + estado propio (T3.c y modelo_cancha ya validados) |
+| T-DEED para refinar balón parado | El MVP heurístico ya implementado (`set_piece_detector.py`) reporta ~85% de precisión según el research para córners/interrupciones largas. Ya teníamos como condición propia no ir más allá "salvo que el MVP rule-based no satisfaga al cliente" (ver "NO incluye" más abajo) | Research + decisión propia preexistente |
+| TrackNetV3/V4 en paralelo a YOLO para el balón | Duplicaría VRAM y tiempo de inferencia sin ROI medible sobre el suavizado cinemático post-hoc (T6) | Research |
+| ReID con Swin-Transformer (SOLIDER-REID) | Sobrecarga computacional no justificada frente a OSNet (ya en uso vía BoT-SORT), mal optimizado para GPU de gama media | Research |
+| SAM / YOLO-seg para team assignment | Coste computacional prohibitivo (research: <5 FPS con 22 jugadores) sin mejora medible sobre alternativas más ligeras (HSV mejorado o embeddings congelados) | Research |
+| NeRF-guided calibration | Tiempos de entrenamiento por escena inviables para un equipo de 2 personas en un flujo offline rápido | Research |
+| Regresión de homografía end-to-end (STN) | No generaliza fuera de distribución — el riesgo exacto de pasar de estadios profesionales a campos de academia con fondos ruidosos | Research |
+| VideoMAE/SlowFast crudo para action spotting | Requiere GPUs de clase A100/H100, fuera de alcance total para RTX 3070/4070 | Research |
+| Subir aún más el buffer de persistencia del tracker (Kalman) para tapar oclusiones largas | Genera derivas fantasma; la vía correcta es reconciliación offline (T8), no más buffer online | Research + auditoría propia (`BOTSORT_TRACK_BUFFER=200` ya en zona de riesgo) |
+
+### Orden de ejecución recomendado (post-research)
+
+| Orden | Tier | Esfuerzo | Motivo |
+|---|---|---|---|
+| 1 | T6 — Suavizado Savitzky-Golay del balón | ~1 día | Quick win puro, cero dependencias nuevas, mejora balón parado y dashboard a la vez |
+| 2 | T7 (Opción A) — Team assignment: césped por HSV real + re-cluster periódico + voto deslizante + portero aparte | 1-2 días | Corrige una brecha real entre lo documentado y lo implementado; visible en cualquier demo con cambios de luz |
+| 3 | T8 — Asociación global de tracklets + retune de `BOTSORT_TRACK_BUFFER` | 2-3 días, bundleado con la validación pendiente de T2 en Kaggle | Mayor impacto de calidad de las 5 áreas del research; reutiliza infraestructura ya construida en T2 |
+| — | T7 (Opción B, SigLIP) | Solo si T7-A no resuelve casos reales de color ambiguo, con evidencia concreta | Evitar over-engineering sin evidencia, mismo criterio que T3 |
+| Defer | PnLCalib completo, T-DEED, y el resto de la tabla "Qué NO hacer" | — | ROI insuficiente para 2 personas en este ciclo |
+
+---
+
 ## Ideas futuras (sin comprometer, evaluar antes de construir)
 
 ### 🔲 Reconocimiento de dorsal (número de camiseta) como señal adicional de identidad
@@ -216,6 +326,23 @@ También tiene valor de producto más allá del tracking: si es fiable, permitir
 
 **Antes de comprometer esfuerzo:** revisar a ojo unos minutos de `video_OG.mp4` real y contar en cuántos frames el dorsal es efectivamente legible desde la cámara de Dinamó. Si es raro, no se justifica. Si aparece con frecuencia razonable, documentarlo como un Tier nuevo con diseño propio.
 
+*(Nota 2026-07-03: el deep research externo auditado en "Roadmap 2026" menciona de forma tangencial un tracker, SportsSUSHI, que usa el número de dorsal como señal adicional y reporta mejor HOTA en secuencias donde es legible — confirma independientemente la misma idea documentada aquí desde antes. No cambia la conclusión: sigue sin validarse contra footage real de Dinamó, así que sigue sin comprometerse.)*
+
+### 🔲 Homografía: explotar la invarianza de cámara fija (calibración base + refinamiento de rotación)
+
+Surgió al auditar el research externo sobre calibración de campo (ver "Roadmap 2026" arriba, Área 1). Es una idea distinta de adoptar PnLCalib completo — eso se posterga explícitamente por ROI insuficiente. Esta es una optimización mucho más acotada sobre lo que ya existe.
+
+Dado que la cámara de Dinamó es fija (no hay PTZ — sin paneo, tilt ni zoom durante el partido), los parámetros intrínsecos y la posición espacial de la cámara no deberían cambiar durante todo el encuentro; lo único que varía son microvibraciones o deriva de rotación. Hoy `view_transformer.py::calcular_matrices_para_video` recalcula la homografía completa por frame (con RANSAC y fallback a la última matriz válida cuando falla la detección de keypoints), sin distinguir "calibración base" de "deriva de rotación frame a frame".
+
+Una versión mínima: acumular los primeros minutos del vídeo para calcular una calibración base robusta (ya tenemos RANSAC + filtrado por confianza para esto) y, en los frames siguientes, estimar solo el ajuste de rotación respecto a esa base en vez de recomputar la homografía entera desde cero. En teoría reduciría el error medio de homografía sin adoptar el pipeline completo de PnLCalib.
+
+**Por qué no se compromete todavía:**
+- Nuestro error actual (5.5m) ya se considera "aceptable" para este caso de uso, incluso según el propio research que evalúa el resto de áreas con un listón más exigente.
+- No hay ninguna queja concreta del cliente sobre precisión de homografía que lo justifique hoy.
+- Tocar `view_transformer.py` es tocar el corazón de heatmaps + balón parado + toda métrica en metros — cualquier cambio aquí exige validación exhaustiva antes de arriesgar producción, con un beneficio hoy especulativo.
+
+**Antes de comprometer esfuerzo:** solo evaluar si aparece evidencia concreta (queja de precisión del cliente, o si T7/T8 exponen que la homografía es el cuello de botella real detrás de algún fallo de heatmap/balón parado).
+
 ---
 
 ## Lo que este plan NO incluye (a propósito)
@@ -223,4 +350,5 @@ También tiene valor de producto más allá del tracking: si es fiable, permitir
 - Análisis táctico (formaciones, pressing, líneas defensivas) — fuera de scope.
 - Tracking en tiempo real durante el partido — fuera de scope corto plazo.
 - Segunda iteración de T3 con etiquetado manual propio (200-300 frames) — la primera iteración ya se validó contra footage real de Dinamó y mostró mejora; solo se reconsideraría si en uso real aparecen fallos sistemáticos que este fine-tuning no resolvió.
-- Clasificación avanzada de tipo de balón parado con modelo de eventos — solo si el MVP rule-based no satisface al cliente.
+- Clasificación avanzada de tipo de balón parado con modelo de eventos (T-DEED) — solo si el MVP rule-based no satisface al cliente. Confirmado como decisión correcta por el research externo auditado en "Roadmap 2026".
+- Técnicas de visión evaluadas y descartadas explícitamente en la auditoría del deep research 2026-07-03 (PnLCalib completo, TrackNetV3/V4 en paralelo, ReID con Swin-Transformer, SAM/YOLO-seg para equipos, NeRF-guided calibration, regresión de homografía end-to-end, VideoMAE/SlowFast crudo, subir aún más el buffer de persistencia del tracker) — ver tabla "Qué NO hacer" en "Roadmap 2026" para la justificación de cada una.
