@@ -31,6 +31,7 @@ import numpy as np
 
 import config
 from utils.perf_monitor import export_processing_meta, run_sanity_checks
+from Trackers.cross_chunk_reid import ChunkBridge
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
@@ -77,6 +78,11 @@ def _find_mp4(directory):
     return max(hits, key=os.path.getmtime) if hits else None
 
 
+def _find_chunk_state(directory):
+    path = os.path.join(directory, "chunk_state.pkl")
+    return path if os.path.exists(path) else None
+
+
 def _mean_pos(pos_list, n):
     """Mean [x, y] over the first n non-None entries of pos_list."""
     pts = [p for p in pos_list[:n] if p is not None]
@@ -87,6 +93,12 @@ def _mean_pos(pos_list, n):
 
 def _match_ids(prev_json, curr_json, overlap_sec, fps):
     """
+    FALLBACK matcher — solo se usa si falta algún chunk_state.pkl (Tier 2,
+    ChunkBridge en Trackers/cross_chunk_reid.py, no pudo correr para algún
+    chunk). Ingenuo a propósito: greedy, sin apariencia, sin restricción de
+    equipo, umbral de posición fijo. Preferir siempre ChunkBridge cuando esté
+    disponible — ver _merge_chunks(id_maps=...).
+
     Build {curr_id: prev_id} by matching mean player positions in the
     overlap window (the same real-world seconds appear at the end of
     prev_json and the start of curr_json).
@@ -133,10 +145,14 @@ def _match_ids(prev_json, curr_json, overlap_sec, fps):
     return mapping
 
 
-def _merge_chunks(chunk_jsons, overlaps):
+def _merge_chunks(chunk_jsons, overlaps, id_maps=None):
     """
     Combine per-chunk player stats into one match JSON.
     overlaps[i] = seconds prepended to chunk i (0 for chunk 0).
+
+    id_maps: lista opcional de {curr_id: global_id} por chunk (Tier 2,
+    ChunkBridge.compute_global_ids(), ya normalizado a claves/valores string).
+    Si es None, cae al matching ingenuo por posición (_match_ids) como antes.
 
     Per-player combination rules:
       - max_speed_kmh, max_acceleration_ms2 : maximum across chunks
@@ -160,7 +176,10 @@ def _merge_chunks(chunk_jsons, overlaps):
         trim_frames   = int(ov * fps)
         trim_secs     = int(ov)
 
-        id_map = _match_ids(prev_json, cj, ov, fps) if (prev_json and ov > 0) else {}
+        if id_maps is not None:
+            id_map = id_maps[i]
+        else:
+            id_map = _match_ids(prev_json, cj, ov, fps) if (prev_json and ov > 0) else {}
         seen   = set()
 
         for curr_id, cdata in cj["players"].items():
@@ -250,9 +269,10 @@ def main():
     chunks_dir   = os.path.join(output_dir, "_chunks")
     os.makedirs(chunks_dir, exist_ok=True)
 
-    chunk_jsons  = []
-    chunk_times  = []  # wall-clock per chunk for the final summary
-    phase_totals = {}  # suma de fases de todos los chunks (para processing_meta)
+    chunk_jsons       = []
+    chunk_state_paths = []  # Tier 2 — cross-chunk ReID, uno por chunk (o None si faltó)
+    chunk_times       = []  # wall-clock per chunk for the final summary
+    phase_totals      = {}  # suma de fases de todos los chunks (para processing_meta)
 
     for i, (cs, ce) in enumerate(chunks):
         tag      = f"chunk{i + 1:02d}"
@@ -298,6 +318,8 @@ def main():
         with open(json_path) as f:
             chunk_jsons.append(json.load(f))
 
+        chunk_state_paths.append(_find_chunk_state(cdir))
+
         # Acumular fases del chunk (Main.py deja processing_meta.json en su DEMO_DIR tmp)
         chunk_meta_path = os.path.join(demo_tmp, "processing_meta.json")
         if os.path.exists(chunk_meta_path):
@@ -310,7 +332,29 @@ def main():
     print(f"\n{'=' * 60}")
     print(f"🔗 Merging {len(chunk_jsons)} chunk(s)...")
 
-    merged = _merge_chunks(chunk_jsons, overlaps)
+    # Tier 2 — cross-chunk ReID: si todos los chunks aportaron su chunk_state.pkl,
+    # usamos Hungarian assignment (apariencia + posición + equipo) en vez del
+    # matching ingenuo por posición. Si falta alguno (embeddings no disponibles,
+    # error de escritura, etc.), caemos al fallback sin romper el run.
+    id_maps = None
+    if len(chunks) == 1:
+        pass  # un solo chunk, nada que reconciliar
+    elif all(p is not None for p in chunk_state_paths):
+        try:
+            bridge = ChunkBridge()
+            bridge.load_chunk_states(chunk_state_paths)
+            raw_maps = bridge.compute_global_ids()
+            id_maps = [{str(k): str(v) for k, v in m.items()} for m in raw_maps]
+            print("🔗 Cross-chunk ReID: Hungarian assignment (apariencia + posición + equipo).")
+        except Exception as e:
+            print(f"⚠️  Cross-chunk ReID falló ({e}); usando matching solo por posición como fallback.")
+            id_maps = None
+    else:
+        missing = chunk_state_paths.count(None)
+        print(f"⚠️  Cross-chunk ReID: faltan {missing}/{len(chunks)} chunk_state.pkl; "
+              f"usando matching solo por posición como fallback.")
+
+    merged = _merge_chunks(chunk_jsons, overlaps, id_maps=id_maps)
 
     today         = datetime.now().strftime("%Y-%m-%d")
     combined_path = os.path.join(output_dir, f"{today}_combined_stats.json")

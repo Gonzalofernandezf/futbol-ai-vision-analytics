@@ -72,6 +72,54 @@ class Tracker:
                 torch.cuda.empty_cache()
         return results
 
+    def get_track_embeddings(self):
+        """Embeddings de apariencia (ReID) de los tracks activos/recién perdidos
+        al momento de llamarla — pensado para invocar justo después de
+        get_object_tracks() al final de un chunk (Tier 2, cross-chunk ReID).
+
+        ADVERTENCIA: lee self.model.predictor.trackers[0], que es API interna
+        de ultralytics (no pública, no estable entre versiones). requirements.txt
+        fija `ultralytics>=8.2.0` con rango abierto, así que una actualización
+        futura de la librería podría renombrar/reestructurar estos atributos y
+        romper esta función en silencio. Por eso es defensiva: si algo falla,
+        devuelve {} y el llamador debe seguir funcionando sin cross-chunk ReID
+        (fallback a matching solo por posición) en vez de tumbar el run.
+
+        Solo tiene sentido con BOTSORT_WITH_REID=true (ver config.py); si el
+        tracker no calculó embeddings, cada entrada devuelta será None.
+
+        Returns:
+            dict[int, np.ndarray | None]: track_id -> embedding (512-d típico
+            para modelos OSNet), o None si ese track no tiene embedding.
+        """
+        embeddings = {}
+        try:
+            trackers = self.model.predictor.trackers
+            if not trackers:
+                return {}
+            bot_tracker = trackers[0]
+            # tracked_stracks: tracks activos en el último frame procesado.
+            # lost_stracks: tracks recién perdidos pero todavía dentro del
+            # track_buffer — relevantes si el jugador salió de cámara justo
+            # antes de que terminara el chunk. Tracks purgados hace mucho
+            # (fuera del buffer) ya no aparecen en ninguna lista — lo cual es
+            # correcto: no son relevantes para el borde del chunk.
+            stracks = list(getattr(bot_tracker, "tracked_stracks", [])) + \
+                      list(getattr(bot_tracker, "lost_stracks", []))
+            for strack in stracks:
+                track_id = getattr(strack, "track_id", None)
+                if track_id is None:
+                    continue
+                feat = getattr(strack, "smooth_feat", None)
+                if feat is None:
+                    feat = getattr(strack, "curr_feat", None)
+                embeddings[int(track_id)] = None if feat is None else np.array(feat)
+        except Exception as e:
+            print(f"⚠️  get_track_embeddings: no se pudieron leer embeddings ({e}). "
+                  f"Cross-chunk ReID caerá a matching solo por posición.")
+            return {}
+        return embeddings
+
     def get_object_tracks(self, frames, read_from_stub=False, stub_path=None):
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
             with open(stub_path, 'rb') as f:
