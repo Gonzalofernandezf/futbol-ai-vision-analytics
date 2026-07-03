@@ -28,18 +28,31 @@ Primer cliente real: **Dinamó Guadalajara** (academia de fútbol, categorías i
 y semipro). Reunión inicial: 09/04/2026. Lo que validó como valioso y lo que pidió
 marca la hoja de ruta corta. Siguientes clientes serán otras academias formativas, clubes de 2da o tercera categoría masculinos y/o femeninos y potencialmente reclutadores internacionales en fases posteriores.
 
-**Prioridad ALTA (construir / pulir ya):**
-- 🔥 Mapas de calor por jugador — diferenciador clave, lo más valorado.
-- 🔥 Análisis de balón parado — demanda no cubierta en categorías inferiores.
-- 🔥 Mejora de detección de puntos de la cancha para realizar transformación del plano (afecta directamente a mapas de calor)
+**Prioridad ALTA:**
+- ✅ Mapas de calor por jugador — implementado (`Heatmap.tsx`, sobre `position_history`).
+  Sigue siendo el diferenciador clave: cualquier mejora de calidad de datos que lo
+  alimente (homografía, tracking) sigue siendo prioridad.
+- ✅ Análisis de balón parado — implementado (`analytics/set_piece_detector.py` +
+  `SetPiecesCard.tsx`), clasifica córner/banda/saque de meta/falta.
+- 🔥 Mejora de detección de puntos de la cancha para la transformación del plano
+  (afecta directamente a mapas de calor y balón parado). Ya tiene ingeniería real
+  (RANSAC, filtrado por confianza, fallback a última matriz válida en
+  `view_transformer/view_transformer.py`), pero sigue siendo el cuello de botella
+  de precisión — pulir, no construir desde cero.
 - 🔥 Robustez del modelo de detección con cámara en posición BAJA (no solo tribuna).
-  Afecta especialmente a la detección de bandas/laterales.
+  Afecta especialmente a la detección de bandas/laterales. **Sin implementar
+  todavía** — no hay ninguna lógica de detección/adaptación de ángulo de cámara
+  en el código; es la única prioridad ALTA que sigue siendo 100% aspiracional.
 
 **Prioridad MEDIA:**
-- Acceso por minuto/instante específico del vídeo desde el dashboard.
-- Análisis combinado de posesión + posicionamiento.
-- Cortes de vídeo automáticos por evento.
-- Datos de aceleración expuestos de forma clara para preparadores físicos.
+- ✅ Acceso por minuto/instante específico del vídeo desde el dashboard —
+  implementado (`VideoContext.seekToMinute`, usado desde `SetPiecesCard`).
+- ✅ Datos de aceleración expuestos para preparadores físicos — implementado
+  (`max_acceleration_ms2` visible en `PlayerCard`, `PlayerRadar`, `PlayerDetailSheet`, `rivals`).
+- Análisis combinado de posesión + posicionamiento — sin implementar.
+- Cortes de vídeo automáticos por evento ("un clic para ver el clip") — sin
+  implementar en el dashboard. Existe `render_annotated_video.py` como CLI manual
+  con `--start-sec/--end-sec`, pero no hay disparo automático por evento ni UI.
 
 **Prioridad BAJA / futuro:**
 - Análisis en tiempo real durante el partido (no a posteriori).
@@ -143,16 +156,34 @@ Tailwind v4 + Recharts.
 ├── camera_movement_estimator/
 │   └── camera_movement_estimator.py    # Compensación movimiento de cámara (optical flow)
 │
+├── ball_detection/                 # Detección/filtrado dedicado del balón
+│
 ├── data_exporter/
 │   └── data_exporter.py            # Exporta tracking → JSON (schema v2)
 │
-├── analytics/                      # Métricas derivadas (sprints, zonas, percentiles)
+├── analytics/                      # Métricas derivadas (sprints, zonas, percentiles,
+│                                    #   set_piece_detector.py: balón parado)
 │
 ├── eval/
-│   └── eval_keypoints.py           # Evaluación de keypoints de cancha vs GT Roboflow
+│   ├── eval_keypoints.py           # Evaluación de keypoints de cancha vs GT Roboflow
+│   ├── eval_ball.py                # Evaluación de tracking de balón
+│   ├── build_history.py            # Construye eval_history.json a partir de runs
+│   ├── test_one_frame.py           # Debug puntual de un frame
+│   └── visualize_keypoints.py      # Visualización de keypoints detectados
 │
 ├── utils/
 │   └── video_utils.py              # Helpers de lectura/escritura de vídeo
+│
+├── render_annotated_video.py        # CLI manual para recortar/renderizar clips (--start-sec/--end-sec)
+├── extract_frames.py                # Extrae frames sueltos de un vídeo (debug/dataset)
+├── debug_player_detection.py        # Debug puntual de detección de jugadores
+├── summary.py                       # Resumen de un run ya procesado
+├── Keepalive.py                     # Utilidad para runs largos en entornos cloud (Kaggle, etc.)
+│
+├── datasets/                        # Datasets locales de entrenamiento/evaluación (ignorado en git)
+├── diag/                            # Scripts/salidas de diagnóstico puntual
+├── docs/                            # Notas de diseño internas (ej. PLAN_player_tracking.md)
+├── tests/                           # Tests (ver sección 4 — no hay suite formal end-to-end todavía)
 │
 ├── futbol-ai-dashboard/            # Dashboard React/Vite — AUTOCONTENIDO
 │   ├── package.json / bun.lock     # Dependencias propias (bun)
@@ -165,9 +196,11 @@ Tailwind v4 + Recharts.
 └── output_videos/                  # Salidas con fecha-versión (ignorado en git)
 ```
 
-**Formato del JSON de salida** (`match_data.json`):
+**Formato del JSON de salida** (`match_data.json`, schema v2 real — ver
+`futbol-ai-dashboard/src/types/match.ts` para la referencia tipada completa):
 ```json
 {
+  "schema_version": 2,
   "match_meta": {
     "duration_seconds": 35.00,
     "fps": 29.97,
@@ -180,18 +213,40 @@ Tailwind v4 + Recharts.
       "max_speed_kmh": 15.86,
       "total_distance_m": 4.74,
       "max_acceleration_ms2": 9.43,
-      "speed_over_time": [null, null, 15.86, 2.77, ...]
+      "speed_over_time": [null, null, 15.86, 2.77, "..."],
+      "position_history": [null, [12.4, 30.1], "..."],
+      "derived": {
+        "sprints": 3,
+        "speed_zones": {"walk_pct": 40, "jog_pct": 35, "run_pct": 20, "sprint_pct": 5},
+        "high_intensity_pct": 12.5,
+        "halves": {"first": {"distance_m": 2100, "sprints": 2, "high_intensity_pct": 10}, "second": "..."},
+        "drop_off_pct": 8.2,
+        "peak_window": {"start_min": 23, "end_min": 28, "avg_speed": 14.1},
+        "position": "CM",
+        "percentiles": {"max_speed_kmh": 72},
+        "missing_data_pct": 3.1
+      }
     }
-  }
+  },
+  "team_stats": {
+    "1": {"team": 1, "leaders": {"max_speed_kmh": "7"}}
+  },
+  "ball": {
+    "position_history": [null, [34.0, 32.0], "..."],
+    "speed_over_time": [null, 8.2, "..."]
+  },
+  "set_pieces": [
+    {"type": "corner", "frame_start": 120, "frame_end": 130, "start_sec": 4.0, "end_sec": 4.3, "position_m": [0.0, 0.0]}
+  ]
 }
 ```
 **Nunca cambiar este schema sin actualizar el dashboard en el mismo PR.**
 
-El schema actual es **v2** (`schema_version: 2`): además de lo anterior, cada jugador
-incluye `position_history` (lista de `[x, y]` en metros o `null`, base de los heatmaps)
-y un bloque `derived` (sprints, zonas de velocidad, percentiles...), más `team_stats`
-a nivel partido. La referencia tipada completa vive en
-`futbol-ai-dashboard/src/types/match.ts`.
+Notas sobre campos opcionales: `ball` está ausente en runs procesados por chunks
+(`run_chunked.py` todavía no fusiona el balón entre chunks — ver
+`docs/PLAN_player_tracking.md`). `derived` y `team_stats` solo existen en schema v2
+(ausentes en JSON v1 legacy). `position_history` es la base de los mapas de calor.
+
 Cualquier extensión del schema requiere PR conjunto: actualizar `data_exporter/` /
 `analytics/`, los types de `match.ts` y el componente que lo consuma en el mismo PR;
 no añadir campos al JSON sin que el frontend los consuma.
