@@ -16,7 +16,7 @@
 | — | Reentrenamiento `modelo_balon.pt` | ✅ Completo |
 | — | Reentrenamiento `modelo_cancha.pt` | ✅ Completo (PCK@5px 93%, error homografía 5.5m) |
 | — | Heatmaps precisos por jugador | ✅ Completo (desbloqueado por nuevo modelo_cancha) |
-| T2 | Cross-chunk ReID | 🔲 Pendiente |
+| T2 | Cross-chunk ReID | ✅ Completo (código). Pendiente validar contra un partido completo real por chunks en Kaggle. |
 | T3 | Reentrenamiento `best_100e.pt` (cámara baja) | ✅ Completo — `best_jugadores_v2.pt` validado sobre `video_OG.mp4` (footage real de Dinamó, cámara 3-4m): mAP50 0.983, id_churn_ratio 3.24→2.46. Fallback a `best_100e.pt` por 1-2 semanas de uso real. |
 | — | Análisis de balón parado | ✅ Completo (backend + dashboard). Pendiente validar detección contra `video_OG.mp4` real. |
 
@@ -116,67 +116,32 @@ Script listo en `datasets/train_jugadores.py`. Parámetros objetivo:
 
 ## Tiers pendientes
 
-### 🔲 Tier 2 — Cross-chunk ReID
+### ✅ Tier 2 — Cross-chunk ReID
 
 **Objetivo:** que un jugador mantenga el mismo `track_id` a lo largo de todo el partido, independientemente de en qué chunk fue procesado.
 
-**Problema actual:** `run_chunked.py` divide el partido en chunks. Cada chunk asigna IDs locales desde cero — el jugador que era ID 5 en el chunk 1 puede ser ID 23 en el chunk 2. El JSON final puede tener 200+ IDs únicos para lo que en realidad son 22 jugadores, rompiendo las estadísticas por jugador (distancia total, velocidad, heatmap) que cruzan chunks.
+**Problema previo:** `run_chunked.py` divide el partido en chunks. Cada chunk asigna IDs locales desde cero. Además, **ya existía** un `_match_ids` en `run_chunked.py` — no partimos de cero: era un matcher ingenuo (solo posición, umbral fijo de 5m, greedy no-óptimo, sin conocer equipo). T2 lo reemplaza por uno mejor, no construye el mecanismo desde cero.
 
-**Decisión de arquitectura acordada:** la reconciliación de IDs se hace como **paso de post-procesado** al final del merge, no de forma secuencial chunk a chunk. Esto permite que los chunks sigan corriendo en paralelo en Kaggle (múltiples CPUs) sin coordinación entre ellos.
+**Decisión de arquitectura:** la reconciliación de IDs sigue siendo un **paso de post-procesado** al final del merge — los chunks corren en paralelo sin coordinación entre ellos, tal como se acordó.
 
-**Diseño**
+**Verificación técnica previa a implementar:** el diseño depende de leer embeddings de apariencia de BoT-SORT. Se confirmó contra el código fuente real de `ultralytics` (v8.4.84, la versión usada en Kaggle) que es viable: `BOTrack` guarda `curr_feat`/`smooth_feat` por track, y como el pipeline ya usa `persist=True`, el objeto tracker interno sigue vivo y accesible vía `self.model.predictor.trackers[0].tracked_stracks`/`lost_stracks` después de `model.track()`. **Advertencia:** esto es API interna/privada de `ultralytics`, no pública — una actualización futura de la librería podría romperlo en silencio. Por eso `Tracker.get_track_embeddings()` es defensiva (try/except, devuelve `{}` si falla) y todo el pipeline de cross-chunk ReID tiene fallback automático al matching antiguo por posición si los embeddings no están disponibles.
 
-Cada chunk, al terminar, guarda un fichero de estado con los embeddings de sus tracks:
+**Diseño implementado:**
 
-```python
-# stubs/chunk_state_{N}.pkl — generado al final de cada chunk
-chunk_state = {
-    track_id: {
-        "team_id": int,
-        "embeddings": List[np.ndarray],   # embeddings OSNet del track (512-d)
-        "mean_embedding": np.ndarray,     # media normalizada para el matching
-        "last_position_m": (x, y),        # última posición en metros (campo)
-        "frame_start_global": int,
-        "frame_end_global": int,
-        "track_duration_frames": int,
-    }
-}
-```
+1. `Trackers/tracker.py::get_track_embeddings()` — lee los embeddings de los tracks activos/recién perdidos al terminar `get_object_tracks()` de un chunk.
+2. `Trackers/cross_chunk_reid.py::build_chunk_state(tracks, embeddings)` — combina esos embeddings con `team`/posición ya calculados en `tracks['players']`. Guarda `first_position_m` **y** `last_position_m` por track (el borrador original solo tenía `last_position_m` — insuficiente, porque cada track necesita servir de "extremo final" al comparar contra el chunk anterior y de "extremo inicial" al comparar contra el siguiente).
+3. `Main.py` — tras la votación de equipo, llama a `build_chunk_state()` y guarda `chunk_state.pkl` en el `OUTPUT_DIR` propio del chunk (no en un `stubs/` compartido como decía el borrador — evita colisiones entre chunks corriendo en paralelo).
+4. `Trackers/cross_chunk_reid.py::ChunkBridge` — Hungarian assignment (`scipy.optimize.linear_sum_assignment`, dependencia nueva) entre el final de un chunk y el inicio del siguiente, con matriz de costes: apariencia (coseno) + posición espacial, equipo como restricción dura (∞ si difiere), umbral de distancia espacial máxima y de coste total máximo para rechazar matches poco confiables. Encadena 3+ chunks correctamente (verificado con datos sintéticos: un jugador que cambia de ID local en cada chunk mantiene su ID global a lo largo de toda la cadena).
+5. `run_chunked.py` — cambio quirúrgico: si todos los chunks aportaron `chunk_state.pkl`, `ChunkBridge` reemplaza a `_match_ids`; si falta alguno, cae automáticamente al matching antiguo por posición (`_match_ids`, ahora documentado como fallback). `_merge_chunks` no cambió su lógica de fusión/recorte, solo recibe un `id_map` mejor.
 
-El paso de merge en `run_chunked.py` añade una etapa de relabeling:
-
-1. Cargar todos los `chunk_state_{N}.pkl` en orden cronológico.
-2. Para cada chunk N > 0, hacer Hungarian assignment entre sus tracks y los del chunk N-1 usando una matriz de costes:
-   - **Coste de apariencia:** distancia coseno entre `mean_embedding`.
-   - **Coste espacial:** distancia euclídea en metros entre `last_position_m` del chunk N-1 y la primera posición del chunk N.
-   - **Coste temporal:** penalización si el gap entre chunks es > 30s (jugador puede haber salido del campo).
-   - **Coste de equipo:** ∞ si `team_id` distinto (nunca asignar IDs entre equipos distintos).
-3. Renombrar IDs locales de cada chunk → IDs globales del partido.
-4. Re-escribir los JSONs de chunks con los IDs globales antes del merge final.
-
-**Nuevo módulo:**
-
-```
-Trackers/
-  cross_chunk_reid.py   # ChunkBridge class
-```
-
-**Interface:**
-
-```python
-bridge = ChunkBridge()
-bridge.load_chunk_states(stubs_dir)          # carga todos los .pkl
-global_id_maps = bridge.compute_global_ids() # Hungarian assignment entre chunks
-bridge.relabel_json(chunk_json, chunk_idx, global_id_maps)  # reescribe IDs
-```
+**Nota sobre el "coste temporal" del borrador original:** no se implementó como término explícito de la matriz de costes — el margen de `CHUNK_OVERLAP_SEC` y el `track_buffer` de BoT-SORT (`BOTSORT_TRACK_BUFFER`) ya limitan naturalmente qué tracks sobreviven hasta el borde del chunk como para ser candidatos a matching; añadir una penalización temporal explícita se dejó fuera del MVP por no aportar señal adicional clara sobre lo que ya filtra el resto del pipeline.
 
 **Validación:**
-- Añadir `match_unique_player_ids` al RUN SUMMARY de `run_chunked.py`.
-- Para un partido completo de 90 min: idealmente ≤ 30 IDs únicos globales.
-- `id_churn_ratio` (de `perf_monitor`) debería bajar significativamente vs. sin T2.
+- Probado end-to-end con datos sintéticos (`ChunkBridge` + `_merge_chunks`): con IDs locales reseteados entre chunks, el merge produce el número correcto de jugadores globales, con `position_history`/distancia acumulados bien.
+- 🔲 **Pendiente:** correr sobre un partido completo real en Kaggle con `run_chunked.py` y comparar `match_unique_player_ids`/`id_churn_ratio` antes/después — no se puede probar en este entorno de desarrollo (sin GPU ni `ultralytics` instalado). Objetivo original del plan: para un partido de 90 min, idealmente ≤30 IDs únicos globales.
 
-**Esfuerzo:** 2-3 días.
-**Riesgo:** medio. Pre-requisito: T1 completo ✅.
+**Esfuerzo real:** ~1 sesión.
+**Riesgo:** medio — la dependencia de API interna de `ultralytics` es el riesgo principal a mediano plazo (mitigado con fallback automático); el ajuste fino de pesos/umbrales de la matriz de costes necesita, como con T3 y balón parado, una validación con datos reales antes de confiar en los números.
 
 ---
 
@@ -225,7 +190,9 @@ bridge.relabel_json(chunk_json, chunk_idx, global_id_maps)  # reescribe IDs
 |-------|------|--------|
 | ~~1~~ | ~~T3 — Reentrenar `best_100e.pt`~~ | ✅ Completo. |
 | ~~2~~ | ~~Balón parado (MVP rule-based)~~ | ✅ Completo (backend + dashboard). Pendiente validar contra `video_OG.mp4` real. |
-| 1 | **T2 — Cross-chunk ReID** | El más complejo; crítico para que las stats de partido completo (heatmaps, distancia) sean correctas a lo largo de 90 min. |
+| ~~3~~ | ~~T2 — Cross-chunk ReID~~ | ✅ Completo (código). Pendiente validar con un partido completo por chunks en Kaggle. |
+
+Los tres tiers priorizados del plan están implementados. Pendiente: validación con datos reales de los tres (Kaggle) antes de darlos por cerrados en producción.
 
 ---
 
