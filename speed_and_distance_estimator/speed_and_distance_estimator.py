@@ -3,7 +3,7 @@ import sys
 import numpy as np
 sys.path.append("../")
 
-from config import MAX_SPEED_KMH, SPEED_MEDIAN_WINDOW, ANNOTATION_SCALE
+from config import MAX_SPEED_KMH, SPEED_MEDIAN_WINDOW, ANNOTATION_SCALE, FRAME_WINDOW, MAX_SPEED_GAP_FRAMES
 
 """
 Speed and Distance Calculation Module
@@ -21,12 +21,12 @@ class SpeedAndDistance_Estimator():
     short tracking gaps while respecting maximum gap thresholds.
     
     Attributes:
-        frame_window (int): Number of frames to average for velocity (default: 5)
+        frame_window (int): Number of frames to average for velocity (config.FRAME_WINDOW)
         frame_rate (int): Video frame rate in fps (updated from video metadata)
     """
     
     def __init__(self):
-        self.frame_window = 5 # We calculate velocity every 5 frames to smooth out noise.
+        self.frame_window = FRAME_WINDOW  # Frames a promediar para suavizar la velocidad (ver config.py).
         self.frame_rate = 24  # We assume 24fps by default, we will overwrite it if necessary.
     
     def add_speed_and_distance_to_tracks(self, tracks):
@@ -91,13 +91,14 @@ class SpeedAndDistance_Estimator():
         self._apply_speed_median_filter(tracks)
 
         # SMART FORWARD FILL (With tolerance limit)
-        # Why 45: position_transformed returns None whenever the homography is
+        # Why 45 by default: position_transformed returns None whenever the homography is
         # degraded (camera pan, pitch keypoints occluded). The speed window is
         # skipped for every such frame, so a 1-second pan at 30fps generates a
         # 30-frame gap with no speed data. 12 frames (~0.4 s) wasn't enough to
         # bridge that. 45 frames (~1.5 s) covers typical broadcast camera pans
         # while still "dying" cleanly when a player genuinely leaves the pitch.
-        MAX_FRAME_GAP = 45
+        # (umbral configurable vía config.MAX_SPEED_GAP_FRAMES)
+        MAX_FRAME_GAP = MAX_SPEED_GAP_FRAMES
 
         for object, object_tracks in tracks.items():
             if object == "ball" or object == "referees": continue

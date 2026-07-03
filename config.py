@@ -78,7 +78,10 @@ FRAME_WINDOW = int(os.getenv("FRAME_WINDOW", "5"))
 MAX_SPEED_KMH = float(os.getenv("MAX_SPEED_KMH", "32"))   # techo biomecánico para fútbol base/semipro
 SPEED_MEDIAN_WINDOW = int(os.getenv("SPEED_MEDIAN_WINDOW", "3"))  # ventanas a medianizar (1 ventana = FRAME_WINDOW frames)
 MIN_TRACK_DURATION = float(os.getenv("MIN_TRACK_DURATION", "0.5"))
-MAX_SPEED_GAP_FRAMES = int(os.getenv("MAX_SPEED_GAP_FRAMES", "30"))
+# 45 frames (~1.5s a 30fps) cubre paneos de cámara típicos en retransmisión sin
+# "morir" de forma sucia cuando un jugador realmente sale de cuadro. Ver
+# speed_and_distance_estimator.py para el razonamiento completo.
+MAX_SPEED_GAP_FRAMES = int(os.getenv("MAX_SPEED_GAP_FRAMES", "45"))
 
 # Calibration parameters
 FIELD_WIDTH_METERS = float(os.getenv("FIELD_WIDTH_METERS", "68"))
@@ -162,6 +165,7 @@ SET_PIECE_MIN_GAP_FRAMES    = int  (os.getenv("SET_PIECE_MIN_GAP_FRAMES",    "5"
 
 # Visualization
 DISTANCE_THRESHOLD_PIXELS = float(os.getenv("DISTANCE_THRESHOLD_PIXELS", "60"))
+POSSESSION_OVERLAY_ALPHA = float(os.getenv("POSSESSION_OVERLAY_ALPHA", "0.4"))  # opacidad del panel de posesión
 
 # Logging
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"

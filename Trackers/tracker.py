@@ -534,7 +534,7 @@ class Tracker:
             (round(1900 * scale), round(970 * scale)),
             (255, 255, 255), -1,
         )
-        alpha = 0.4
+        alpha = _cfg.POSSESSION_OVERLAY_ALPHA
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
         # 2. NumPy logic (THE IMPORTANT CHANGE)
