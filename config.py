@@ -149,6 +149,15 @@ BALL_INTERP_DIRECTION = os.getenv("BALL_INTERP_DIRECTION",     "both")    # 'for
 BALL_STATIC_RADIUS_M       = float(os.getenv("BALL_STATIC_RADIUS_M",       "0.5"))
 BALL_STATIC_WINDOW_FRAMES  = int  (os.getenv("BALL_STATIC_WINDOW_FRAMES",  "30"))
 
+# T6 — Suavizado Savitzky-Golay de la trayectoria del balón (post-filtros, antes
+# de balón parado y export). Opera sobre position_transformed (metros) por tramo
+# continuo de detecciones; NO rellena huecos (eso es BALL_INTERP_*) ni los crea.
+# Ventana en frames (impar); rango de referencia 13-23 con orden 2 — ver
+# docs/PLAN_player_tracking.md, Tier T6.
+BALL_SAVGOL_ENABLED   = os.getenv("BALL_SAVGOL_ENABLED", "true").lower() == "true"
+BALL_SAVGOL_WINDOW    = int(os.getenv("BALL_SAVGOL_WINDOW",    "15"))
+BALL_SAVGOL_POLYORDER = int(os.getenv("BALL_SAVGOL_POLYORDER", "2"))
+
 # Pitch field dimensions for out-of-bounds guard (FIFA standard, meters)
 PITCH_LENGTH_M      = float(os.getenv("PITCH_LENGTH_M",      "100.0"))
 PITCH_WIDTH_M       = float(os.getenv("PITCH_WIDTH_M",       "64.0"))

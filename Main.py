@@ -14,6 +14,7 @@ from view_transformer.view_transformer import ViewTransformer
 from speed_and_distance_estimator.speed_and_distance_estimator import SpeedAndDistance_Estimator
 from data_exporter.data_exporter import GameStatsExporter
 from analytics.set_piece_detector import detect_set_pieces
+from analytics.ball_smoothing import smooth_ball_positions
 from Trackers.cross_chunk_reid import build_chunk_state
 import shutil
 import config
@@ -236,6 +237,11 @@ def main():
             radius_m      = config.BALL_STATIC_RADIUS_M,
             window_frames = config.BALL_STATIC_WINDOW_FRAMES,
         )
+
+        # T6 — suavizado Savitzky-Golay sobre la trayectoria ya filtrada, ANTES
+        # de balón parado y export: ambos derivan velocidad de estas posiciones.
+        if config.BALL_SAVGOL_ENABLED:
+            tracks["ball"] = smooth_ball_positions(tracks["ball"])
 
     # Set-piece detection (balón parado) — corre sobre el balón ya filtrado,
     # combinando la señal de "salió de cancha" (ball_out_of_bounds_events) con

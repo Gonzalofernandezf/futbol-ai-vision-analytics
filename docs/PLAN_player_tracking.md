@@ -229,14 +229,27 @@ Lo que sigue no es una transcripción de esa matriz: es la contrastación de cad
 
 ### Nuevos tiers propuestos
 
-#### 🔲 T6 — Suavizado cinemático del balón (Savitzky-Golay)
+#### ✅ T6 — Suavizado cinemático del balón (Savitzky-Golay) — implementado 2026-07-03
 
-**Objetivo:** reducir el ruido de `speed_over_time` del balón. Hoy se calcula como derivada frame-a-frame cruda sobre `position_transformed` (`data_exporter/data_exporter.py::_export_ball`, líneas 59-64), sin ningún filtro tras la interpolación de huecos. Esto afecta: (a) la fiabilidad de `SET_PIECE_STATIONARY_KMH`/`SET_PIECE_STATIONARY_SEC` en `analytics/set_piece_detector.py` — un pico de ruido puntual puede romper una ventana de "balón inmóvil" y perder una falta/tiro libre real; (b) la curva de velocidad del balón que ve el usuario en el dashboard; (c) indirectamente, la suavidad de la trayectoria dibujada en heatmap/minimapa.
+**Objetivo:** reducir el ruido de `speed_over_time` del balón. Antes se calculaba como derivada frame-a-frame cruda sobre `position_transformed` (`data_exporter/data_exporter.py::_export_ball`), sin ningún filtro tras la interpolación de huecos. Afectaba: (a) la fiabilidad de `SET_PIECE_STATIONARY_KMH`/`SET_PIECE_STATIONARY_SEC` en `analytics/set_piece_detector.py`; (b) la curva de velocidad del balón en el dashboard; (c) la suavidad de la trayectoria en heatmap/minimapa.
 
-**Qué añadir:** `scipy.signal.savgol_filter` sobre `position_history` del balón, aplicado después de `filter_ball_positions_by_speed` y antes de calcular `speed_over_time` en el exportador. Ventana 13-23 frames, orden polinomial 2 (valores de referencia del research; validar el óptimo contra `video_OG.mp4`, igual que se hizo con los demás umbrales del proyecto). No tocar `BALL_INTERP_LIMIT` — el research advierte contra alargar huecos interpolados linealmente más allá de ~3-5 frames, no contra suavizar la trayectoria ya interpolada.
+**Implementación:**
+- `analytics/ball_smoothing.py::smooth_ball_positions` (función pura nueva) — `scipy.signal.savgol_filter` sobre `position_transformed` del balón, **por tramo continuo de detecciones**: no rellena huecos ni los crea (crítico: `detect_boundary_events` depende de la estructura exacta de huecos para detectar salidas de cancha). Tramos más cortos que la ventana usan la mayor ventana impar que quepa; si no cabe ninguna válida, quedan crudos.
+- `config.py` — `BALL_SAVGOL_ENABLED` (default true, permite A/B sin tocar código en la validación de Kaggle), `BALL_SAVGOL_WINDOW=15`, `BALL_SAVGOL_POLYORDER=2`. También en `.env.example`.
+- `Main.py` — se aplica dentro de la fase "Ball filters", después de `filter_static_ball_clusters` y **antes de `detect_set_pieces`** (no solo antes del export, como decía el borrador): así el detector de balón parado también ve la señal limpia, que era el beneficio (a).
+- Solo se suaviza `position_transformed` (metros); `bbox`/`position` (píxeles) quedan crudos — el vídeo anotado y la asignación de posesión usan píxeles y no se benefician.
 
-**Esfuerzo:** ~1 día. Cero dependencias nuevas — `scipy>=1.10.0` ya está en `requirements.txt` desde T2.
-**Riesgo:** muy bajo — post-procesado matemático puro sobre datos ya filtrados; no toca detección ni tracking.
+**Validación (sintética, sin GPU — 2026-07-03):**
+- Balón en movimiento con ruido gaussiano: std de la velocidad frame-a-frame 32.6 → 6.1 km/h; error medio de posición vs. verdad sin ruido 0.415m → 0.174m (el filtro alisa sin distorsionar).
+- Huecos preservados exactamente (mismos frames vacíos antes/después); tramos de 2 frames quedan crudos sin crash.
+- Balón parado con jitter de localización: con 2cm de jitter, la velocidad media cruda de un balón **quieto** es 3.55 km/h (¡lejos del umbral de 1.0 de `SET_PIECE_STATIONARY_KMH` — el detector de faltas no podría dispararse nunca sobre detecciones reales crudas!) → suavizada 0.43 km/h. Con 5cm: 9.27 → 1.12 km/h (queda justo en el umbral). **Implicación: T6 no es solo "mejora" para `detect_stationary_events` — es habilitante.** Con la señal cruda, cualquier jitter realista hacía el umbral de 1.0 km/h inalcanzable.
+
+**Notas para la validación real de balón parado (pendiente, contra `video_OG.mp4`):**
+1. Si el jitter real ronda los 5cm+, incluso suavizado queda al filo del umbral — probablemente haya que subir `SET_PIECE_STATIONARY_KMH` a ~2-3 km/h. Decidir con datos reales, no ahora.
+2. **Tensión preexistente descubierta durante T6** (no causada por T6): `filter_static_ball_clusters` elimina cualquier detección que se quede dentro de `BALL_STATIC_RADIUS_M=0.5` durante `BALL_STATIC_WINDOW_FRAMES=30` (~1s) — la firma de una mancha del césped, pero **también la de un balón genuinamente parado antes de una falta** (que necesita ≥5s de quietud para `detect_stationary_events`). Es decir: el filtro anti-manchas puede estar borrando exactamente los eventos que el detector de faltas necesita ver, convirtiéndolos en huecos sin `out_of_bounds_events` (invisibles para ambas señales). Revisar en la validación real: si las faltas no aparecen, este filtro es el primer sospechoso — posibles salidas: exigir que el clúster estático dure mucho más que `SET_PIECE_STATIONARY_SEC` para considerarlo mancha, o usar persistencia (una mancha es estática durante minutos, un balón de falta durante segundos).
+
+**Esfuerzo real:** ~1 sesión. Cero dependencias nuevas.
+**Riesgo:** muy bajo — post-procesado matemático puro, desactivable con `BALL_SAVGOL_ENABLED=false`.
 
 ---
 
@@ -312,7 +325,7 @@ Lectura: el salto real está entre 10 y 100 (10 rompe el objetivo ≤3.0 en el c
 
 | Orden | Tier | Esfuerzo | Motivo |
 |---|---|---|---|
-| 1 | T6 — Suavizado Savitzky-Golay del balón | ~1 día | Quick win puro, cero dependencias nuevas, mejora balón parado y dashboard a la vez |
+| ~~1~~ | ~~T6 — Suavizado Savitzky-Golay del balón~~ | ✅ Completo 2026-07-03 (código + validación sintética; validación con vídeo real pendiente, junto a balón parado) | Resultó habilitante, no solo mejora: sin suavizado, el umbral de "balón inmóvil" era inalcanzable con jitter realista — ver detalle en T6 |
 | 2 | T7 (Opción A) — Team assignment: césped por HSV real + re-cluster periódico + voto deslizante + portero aparte | 1-2 días | Corrige una brecha real entre lo documentado y lo implementado; visible en cualquier demo con cambios de luz |
 | ~~3~~ | ~~Retune de `BOTSORT_TRACK_BUFFER` (parte de T8)~~ | ✅ Completo 2026-07-03 — bajado de 200 a 100, ver detalle en T8 | Desacoplado de T8: no hizo falta esperar al Splitter/Connector, se validó solo con dos clips reales |
 | 3 | T8 — Asociación global de tracklets (Splitter DBSCAN + Connector generalizado) | 2-3 días, bundleado con la validación pendiente de T2 en Kaggle sobre un tramo acotado (~12-15 min, no partido completo — ver corrección 2026-07-03) | Mayor impacto de calidad de las 5 áreas del research; reutiliza infraestructura ya construida en T2 |
