@@ -253,7 +253,22 @@ Lo que sigue no es una transcripción de esa matriz: es la contrastación de cad
 
 ---
 
-#### 🔲 T7 — Team assignment: cerrar la brecha real (dos opciones, decidir antes de implementar)
+#### ✅ T7 — Team assignment: cerrar la brecha real — Opción A implementada 2026-07-03
+
+**Estado:** las 5 sub-tareas de la Opción A implementadas y validadas con escenas sintéticas (frames BGR artificiales: cancha verde, equipo rojo, equipo azul, portero amarillo — sin GPU):
+- Separación de equipos correcta con césped dentro del bbox (la máscara HSV devuelve el color exacto del jersey; sin máscara, desvía 25 unidades BGR hacia el verde).
+- **Primer frame en sombra corregido por el voto deslizante** — el caso exacto que el código anterior congelaba para siempre (ID que arranca 8 frames en sombra dura acaba en su equipo correcto).
+- Portero excluido del entrenamiento: centroides caen exactamente en rojo/azul puros (distancia 0) con el amarillo a 173 — antes lo arrastraba.
+- Cambio de iluminación a mitad de clip + re-clusters forzados cada 2s: **0 flips de equipo** (el anclaje de labels funciona).
+- `Main.py` y `debug_player_detection.py` comparten `TeamAssigner.assign_teams()` — eliminada la lógica duplicada (y el voto muerto) de ambos.
+
+**⚠️ Cambio de semántica de `team_flip_rate`:** antes daba 0% por construcción — el voto global sobrescribía todos los frames de cada ID con un único valor, así que la métrica no podía ver flips aunque el sistema se equivocara. Con T7 mide estabilidad real por frame. En la validación con vídeo real, un valor pequeño >0% **no es una regresión**: es la métrica volviéndose significativa. El objetivo <2% aplica ahora de verdad.
+
+**Validación pendiente (vídeo real):** correr `debug_player_detection.py` sobre los dos clips conocidos de `video_OG.mp4` y comparar contra el baseline pre-T7 (`unique player IDs`, `id_churn_ratio`, `team_flip_rate` con su nueva semántica) + una corrida con render para inspección visual de colores estables y portero.
+
+---
+
+##### Diseño original (referencia)
 
 Ver la tabla de corrección en la sección T4 arriba para el diagnóstico completo. Resumen: sin máscara de césped, sin re-cluster tras frame 0, voto global de todo el partido en vez de ventana deslizante, y portero contaminando el clustering de equipo porque se remapea a `player` (`Trackers/tracker.py:166-167`) antes de llegar al team assigner.
 
@@ -334,7 +349,7 @@ Lectura: el salto real está entre 10 y 100 (10 rompe el objetivo ≤3.0 en el c
 | Orden | Tier | Esfuerzo | Motivo |
 |---|---|---|---|
 | ~~1~~ | ~~T6 — Suavizado Savitzky-Golay del balón~~ | ✅ Completo 2026-07-03 (código + validación sintética; validación con vídeo real pendiente, junto a balón parado) | Resultó habilitante, no solo mejora: sin suavizado, el umbral de "balón inmóvil" era inalcanzable con jitter realista — ver detalle en T6 |
-| 2 | T7 (Opción A) — Team assignment: césped por HSV real + re-cluster periódico + voto deslizante + portero aparte | 1-2 días | Corrige una brecha real entre lo documentado y lo implementado; visible en cualquier demo con cambios de luz |
+| ~~2~~ | ~~T7 (Opción A) — Team assignment robusto~~ | ✅ Completo 2026-07-03 (código + validación sintética; validación con vídeo real pendiente, junto a T6) | El voto anterior era un no-op (equipo congelado en el primer frame de cada ID); ver detalle y cambio de semántica de team_flip_rate en T7 |
 | ~~3~~ | ~~Retune de `BOTSORT_TRACK_BUFFER` (parte de T8)~~ | ✅ Completo 2026-07-03 — bajado de 200 a 100, ver detalle en T8 | Desacoplado de T8: no hizo falta esperar al Splitter/Connector, se validó solo con dos clips reales |
 | 3 | T8 — Asociación global de tracklets (Splitter DBSCAN + Connector generalizado) | 2-3 días, bundleado con la validación pendiente de T2 en Kaggle sobre un tramo acotado (~12-15 min, no partido completo — ver corrección 2026-07-03) | Mayor impacto de calidad de las 5 áreas del research; reutiliza infraestructura ya construida en T2 |
 | — | T7 (Opción B, SigLIP) | Solo si T7-A no resuelve casos reales de color ambiguo, con evidencia concreta | Evitar over-engineering sin evidencia, mismo criterio que T3 |

@@ -133,6 +133,19 @@ CROSS_CHUNK_MAX_COST          = float(os.getenv("CROSS_CHUNK_MAX_COST",         
 # Crowd / stands mask: ignore detections whose top-Y is above this many pixels
 CROWD_MASK_Y_PX     = int  (os.getenv("CROWD_MASK_Y_PX",     "80"))
 
+# T7 — Team assignment robusto (ver docs/PLAN_player_tracking.md, Tier T7).
+# Máscara HSV de césped en la extracción de color del jersey (T7.a):
+TEAM_HSV_MASK_ENABLED     = os.getenv("TEAM_HSV_MASK_ENABLED", "true").lower() == "true"
+TEAM_GRASS_HUE_LOW        = int  (os.getenv("TEAM_GRASS_HUE_LOW",        "35"))   # hue OpenCV (0-179): inicio del rango verde
+TEAM_GRASS_HUE_HIGH       = int  (os.getenv("TEAM_GRASS_HUE_HIGH",       "85"))   # fin del rango verde
+TEAM_GRASS_MIN_PIXELS_PCT = float(os.getenv("TEAM_GRASS_MIN_PIXELS_PCT", "20.0")) # si sobrevive menos % tras la máscara, fallback a media sin máscara
+# Burn-in multi-frame para entrenar centroides (T7.b) y re-cluster periódico (T7.c):
+TEAM_BURNIN_SEC           = float(os.getenv("TEAM_BURNIN_SEC",           "10.0")) # segundos iniciales muestreados para el K-Means global
+TEAM_SAMPLE_EVERY_N_FRAMES= int  (os.getenv("TEAM_SAMPLE_EVERY_N_FRAMES","10"))   # stride de muestreo en burn-in y buffer de re-cluster
+TEAM_RECLUSTER_SEC        = float(os.getenv("TEAM_RECLUSTER_SEC",        "60.0")) # 0 = desactivado; re-fit con anclaje de labels
+# Voto deslizante por track ID (T7.d):
+TEAM_VOTE_WINDOW_SEC      = float(os.getenv("TEAM_VOTE_WINDOW_SEC",      "5.0"))
+
 # Ball detection gates (applied per-frame before any tracking)
 BALL_MIN_CONF       = float(os.getenv("BALL_MIN_CONF",       "0.35"))  # post-detection confidence gate
 BALL_MAX_BBOX_PX    = int  (os.getenv("BALL_MAX_BBOX_PX",    "90"))    # max width OR height in pixels (socks/stains are larger)

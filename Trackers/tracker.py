@@ -163,8 +163,13 @@ class Tracker:
                 track_id = int(track_ids[idx])
                 cls_name = cls_names.get(cls_id, "")
 
-                # Remap goalkeeper → player
-                if cls_name == "goalkeeper":
+                # Remap goalkeeper → player para el pipeline downstream, pero
+                # conservando el flag: el team assigner lo usa para excluir su
+                # kit (distinto al de ambos equipos) del clustering de colores
+                # (T7.e). Consumidores deben leerlo con .get() — los stubs
+                # antiguos no traen la clave.
+                is_goalkeeper = cls_name == "goalkeeper"
+                if is_goalkeeper:
                     cls_name = "player"
 
                 position = ((bbox[0] + bbox[2]) / 2, bbox[3])
@@ -173,6 +178,7 @@ class Tracker:
                     tracks["players"][frame_num][track_id] = {
                         "bbox": bbox,
                         "position": position,
+                        "is_goalkeeper": is_goalkeeper,
                     }
                 elif cls_name == "referee":
                     tracks["referees"][frame_num][track_id] = {

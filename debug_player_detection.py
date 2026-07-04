@@ -52,28 +52,11 @@ def main():
     print("🔍 Detectando jugador/portero/árbitro (sin balón/campo/velocidad)...")
     tracks = tracker.get_object_tracks(video_frames, read_from_stub=False, stub_path=None)
 
+    # T7: mismo entry point que Main.py (burn-in + re-cluster + voto deslizante),
+    # sin lógica duplicada aquí.
     team_assigner = TeamAssigner()
-    team_assigner.assign_team_color(video_frames[0], tracks['players'][0])
-
     print("🧠 Asignando equipos...")
-    for frame_num, player_track in enumerate(tracks['players']):
-        for player_id, track in player_track.items():
-            team = team_assigner.get_player_team(video_frames[frame_num], track['bbox'], player_id)
-            tracks['players'][frame_num][player_id]['team'] = team
-            tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team]
-
-    # Votación por mayoría (igual que Main.py) para que el color no parpadee.
-    player_team_votes = {}
-    for player_track in tracks['players']:
-        for player_id, track in player_track.items():
-            player_team_votes.setdefault(player_id, []).append(track['team'])
-
-    for player_id, votes in player_team_votes.items():
-        team_winner = max(set(votes), key=votes.count)
-        for frame_num in range(len(tracks['players'])):
-            if player_id in tracks['players'][frame_num]:
-                tracks['players'][frame_num][player_id]['team'] = team_winner
-                tracks['players'][frame_num][player_id]['team_color'] = team_assigner.team_colors[team_winner]
+    team_assigner.assign_teams(video_frames, tracks['players'], fps)
 
     if config.SKIP_VIDEO_OUTPUT:
         print("⏭️  SKIP_VIDEO_OUTPUT=true — saltando el render, solo métricas.")
